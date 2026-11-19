@@ -6,15 +6,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'rec', 'frames');
-fs.mkdirSync(DIR, { recursive: true });
+const DIR_V = DIR + '_v';                              // 竖版的帧（POST /frame/<序号>?d=v）
+fs.mkdirSync(DIR, { recursive: true }); fs.mkdirSync(DIR_V, { recursive: true });
 const CORS = { 'Access-Control-Allow-Origin': 'http://localhost:5183', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'content-type' };
 http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
-  const m = /^\/frame\/(\d+)$/.exec(req.url || '');
+  const m = /^\/frame\/(\d+)(\?d=v)?$/.exec(req.url || '');
   if (req.method === 'POST' && m) {
     const chunks = [];
     req.on('data', (c) => chunks.push(c));
-    req.on('end', () => { fs.writeFileSync(path.join(DIR, 'f_' + String(m[1]).padStart(5, '0') + '.jpg'), Buffer.from(Buffer.concat(chunks).toString('latin1'), 'base64')); res.writeHead(200, CORS); res.end('ok'); });
+    req.on('end', () => { fs.writeFileSync(path.join(m[2] ? DIR_V : DIR, 'f_' + String(m[1]).padStart(5, '0') + '.jpg'), Buffer.from(Buffer.concat(chunks).toString('latin1'), 'base64')); res.writeHead(200, CORS); res.end('ok'); });
     return;
   }
   // 调机位时的单张预览：POST /snap/<名字> 存到 rec/snap/<名字>.jpg
