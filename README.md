@@ -6,7 +6,7 @@
 
 ## 怎么打开
 
-**在线**：仓库开启 GitHub Pages 后，直接访问页面地址即可（首次加载约 40 MB，请耐心等进度条走完）。
+**在线**：<https://lirui061202-beep.github.io/zootopia-land-tour/>（首次加载约 40 MB，请耐心等进度条走完）。
 
 **本地**：
 
