@@ -1,4 +1,4 @@
-// 把 rec/frames 里的逐帧画面合成成片：片头字（滤色叠加）、行李牌字幕、片尾字、淡入淡出，可选配乐。
+// 把 rec/frames 里的逐帧画面合成成片：片头字、蓝色路牌字幕、片尾字、淡入淡出，可选配乐。
 // 用法：node tools/rec-compose.mjs [配乐文件]   →  rec/zootopia-diary.mp4
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,18 +27,18 @@ const CAPS = [
 // 1. 每条字幕做成一张带透明底的行李牌
 CAPS.forEach(([, , zh, en], i) => {
   fs.writeFileSync(`cap${i}_zh.txt`, zh); fs.writeFileSync(`cap${i}_en.txt`, en);
-  ff(['-i', 'gfx/plate.png', '-vf',
-    `colorkey=0xFF00FF:0.34:0.06,crop=1450:300:5:362,scale=1000:-1,` +
-    `drawtext=fontfile=font_b.ttc:textfile=cap${i}_zh.txt:fontsize=42:fontcolor=0x23474a:x=150:y=58,` +
-    `drawtext=fontfile=font_r.ttc:textfile=cap${i}_en.txt:fontsize=22:fontcolor=0x3a8a86:x=152:y=124`,
+  ff(['-i', 'gfx/plate2.png', '-vf',
+    `colorkey=0xFF00FF:0.30:0.08,crop=1392:262:72:381,scale=1000:-1,` +
+    `drawtext=fontfile=font_b.ttc:textfile=cap${i}_zh.txt:fontsize=42:fontcolor=white:shadowcolor=0x0a2a80@0.7:shadowx=0:shadowy=2:x=166:y=44,` +
+    `drawtext=fontfile=font_r.ttc:textfile=cap${i}_en.txt:fontsize=22:fontcolor=0xd6e9ff:x=168:y=110`,
     '-frames:v', '1', `cap${i}.png`]);
 });
 fs.writeFileSync('end_zh.txt', '动物城，下次见'); fs.writeFileSync('end_en.txt', '爱好者制作的非官方还原 · 非商用    FAN-MADE · NON-COMMERCIAL');
 
 // 2. 合成
-const inputs = ['-framerate', String(FPS), '-i', 'frames/f_%05d.jpg', '-loop', '1', '-t', String(DUR), '-i', 'gfx/title.png'];
+const inputs = ['-framerate', String(FPS), '-i', 'frames/f_%05d.jpg', '-loop', '1', '-t', String(DUR), '-i', 'gfx/title2.png'];
 CAPS.forEach((_, i) => inputs.push('-loop', '1', '-t', String(DUR), '-i', `cap${i}.png`));
-let g = `[1:v]scale=1500:-1,format=rgba,colorkey=0x000000:0.09:0.14,fade=t=in:st=1.0:d=0.8:alpha=1,fade=t=out:st=5.3:d=0.8:alpha=1[ttl];` +
+let g = `[1:v]scale=1500:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=1.0:d=0.8:alpha=1,fade=t=out:st=5.3:d=0.8:alpha=1[ttl];` +
         // 片头字抠掉黑底后直接盖在画面上（滤色叠加在白天的亮天空上会发灰），字后面的画面同时压暗一点
         `[0:v]eq=brightness='-0.10*between(t,1.2,5.9)':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-40:enable='between(t,1,6.2)',format=yuv420p[v0];`;
 CAPS.forEach(([a, b], i) => {
