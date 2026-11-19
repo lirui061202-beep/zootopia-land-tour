@@ -55,7 +55,7 @@ function grassTex() {
     for (let i = 0; i < 70; i++) {
       const x = rnd() * S, y = rnd() * S, r = 30 + rnd() * 80, c = rnd() < 0.5 ? '84,122,66' : rnd() < 0.5 ? '128,160,92' : '100,140,74';
       for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
-        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); gr.addColorStop(0, 'rgba(' + c + ',.5)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); gr.addColorStop(0, 'rgba(' + c + ',.72)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
         g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
       }
     }
@@ -220,7 +220,8 @@ export function buildGround(scene, tex) {
 
   // 6. 中央绿地（遮挡矿山车的种植带）：岩石路缘 + 草坡
   const curb = new THREE.Mesh(polyPrism(PARK, 0, 0.6), rockMat); curb.castShadow = curb.receiveShadow = true; G.add(curb);
-  const lawn = new THREE.Mesh(polyFlat(PARK, 0.61, 3), grassMat); lawn.receiveShadow = true; G.add(lawn);
+  // 草斑放大到一两米一块：隔着几十米看也有深浅，不是一整片平涂
+  const lawn = new THREE.Mesh(polyFlat(PARK, 0.61, 10), grassMat); lawn.receiveShadow = true; G.add(lawn);
 
   // 7. 园区外围草地（南侧、东侧），让视线越过围墙时不穿帮
   const outerT = canvasTex(grassC, { repeat: [150, 150] }); outerT.wrapS = outerT.wrapT = THREE.RepeatWrapping;

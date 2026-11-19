@@ -466,12 +466,12 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
         const t = d / L, x = a[0] + (b[0] - a[0]) * t + 1.25, y = a[1] + (b[1] - a[1]) * t + 0.33, k = (list.length * 0.37) % 1;
         list.push({ x, z: y, y: pointInPoly(x, y, PARK) ? 0.58 : 0, s: 0.95 + k * 0.3, ry: list.length * 1.9 });
       }
-      G.add(instanced(cf.core, new THREE.MeshStandardMaterial({ color: 0x1f4a2c, roughness: 1 }), list), instanced(cf.trunk, M.trunk, list), instanced(cf.cards, cm, list));
+      G.add(instanced(cf.core, new THREE.MeshStandardMaterial({ color: 0x35603a, roughness: 1 }), list), instanced(cf.trunk, M.trunk, list), instanced(cf.cards, cm, list));
       // 柏树之间和树尖上方还是会露出墙面和平直的屋檐线：整面墙再爬满藤叶，叶子略高出檐口
       const lm = cutMat('leafA');
       if (lm) {
         const iv = ivyWall(L, 7.7, 5);
-        for (const [geo, mat] of [[iv.back, coreMaterial(null, 0x4f6a45)], [iv.cards, lm]]) { const m = new THREE.Mesh(geo, mat); placeAB(m, b, a); m.castShadow = m.receiveShadow = true; G.add(m); }
+        for (const [geo, mat] of [[iv.back, coreMaterial(null, 0x6f9460)], [iv.cards, lm]]) { const m = new THREE.Mesh(geo, mat); placeAB(m, b, a); m.castShadow = m.receiveShadow = true; G.add(m); }
       }
     }
   }
