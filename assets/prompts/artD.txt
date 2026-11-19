@@ -1,0 +1,8 @@
+Generate one image: a sheet of SIX separate square panels arranged in a neat grid of 3 columns by 2 rows, filling the whole image edge to edge, each panel exactly one sixth of the image. Every panel has a perfectly flat solid pure magenta (#FF00FF) background with nothing else in it, and contains ONE cut-out figure of an original generic anthropomorphic animal resident of a cartoon city, in a stylized 3D-animated-film look (soft rounded shapes, friendly, clean studio lighting). They are original characters, not based on any existing film or cartoon character. Each figure is shown from the waist up, facing the viewer, centred in its panel with clear magenta margin all around, and its lower edge is cut straight (as if standing behind a window sill). No text, no logos, no props touching the panel edges.
+Panels, left to right, top row then bottom row:
+1. Only an elephant's grey trunk reaching forward and curling upward, holding a small watering can (no head visible).
+2. A middle-aged rabbit couple side by side in city clothes (a cardigan and a scarf), waving happily.
+3. A sleepy sloth in a cosy striped sweater, smiling slowly with one arm raised in a lazy wave.
+4. A big gentle polar bear wearing a knitted cardigan, leaning forward with folded arms.
+5. A shaggy brown yak wearing a small knitted hat, cheerful.
+6. Two grey wolves in pyjamas with heads tilted up, howling together.

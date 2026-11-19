@@ -1,0 +1,11 @@
+# 贴图的 PNG 原图和生成过程的中间文件（体积大，运行时不需要）
+assets/tex_png/
+assets/hd/
+assets/lo/
+assets/old/
+assets/gen_*/
+assets/log_*.txt
+# 录制视频的逐帧画面和成片素材
+rec/
+node_modules/
+.claude/

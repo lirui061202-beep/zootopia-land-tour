@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>上海迪士尼 · 疯狂动物城园区 · 虚拟游览</title>
+<style>
+  :root { --ink:#fff; --panel:rgba(18,22,38,.62); --line:rgba(255,255,255,.18); --accent:#ffb43a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden; background:#0b0e1a; color:var(--ink);
+    font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans SC",system-ui,sans-serif; }
+  canvas#view { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .hud { position:fixed; pointer-events:none; user-select:none; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  #title { left:18px; top:16px; padding:10px 16px; }
+  #title b { font-size:17px; letter-spacing:.06em; }
+  #title span { display:block; font-size:12px; opacity:.72; margin-top:2px; }
+  #bar { right:18px; top:16px; display:flex; gap:8px; pointer-events:auto; }
+  #bar button { all:unset; cursor:pointer; padding:9px 14px; font-size:13px; border-radius:12px;
+    background:var(--panel); border:1px solid var(--line); backdrop-filter:blur(10px); transition:background .15s, transform .1s; }
+  #bar button:hover { background:rgba(60,70,110,.75); }
+  #bar button:active { transform:scale(.97); }
+  #bar button.on { background:var(--accent); color:#1b1408; border-color:transparent; font-weight:600; }
+  #poi { left:50%; top:18px; transform:translateX(-50%); padding:8px 18px; font-size:15px; opacity:0; transition:opacity .35s; text-align:center; white-space:nowrap; }
+  #poi small { display:block; font-size:11px; opacity:.7; letter-spacing:.04em; }
+  #help { left:18px; bottom:16px; padding:10px 14px; font-size:12px; line-height:1.75; opacity:.9; }
+  #help kbd { display:inline-block; min-width:20px; text-align:center; padding:0 5px; margin:0 1px; border:1px solid var(--line); border-radius:5px; font:11px ui-monospace,Consolas,monospace; background:rgba(255,255,255,.08); }
+  #map { right:18px; bottom:16px; width:230px; height:190px; padding:0; overflow:hidden; pointer-events:auto; cursor:pointer; }
+  #map canvas { width:100%; height:100%; display:block; }
+  #cross { left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; background:rgba(255,255,255,.75); box-shadow:0 0 0 1px rgba(0,0,0,.35); opacity:0; }
+  body.walking #cross { opacity:1; }
+  #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:18px;
+    background:radial-gradient(ellipse at 50% 40%, rgba(40,52,110,.55), rgba(8,10,22,.92)); z-index:10; text-align:center; transition:opacity .5s; }
+  #start h1 { margin:0; font-size:34px; letter-spacing:.12em; font-weight:700; }
+  #start p { margin:0; opacity:.78; font-size:14px; max-width:560px; line-height:1.8; }
+  #start .go { all:unset; cursor:pointer; padding:13px 34px; border-radius:999px; background:var(--accent); color:#1b1408; font-weight:700; font-size:16px; letter-spacing:.1em; }
+  #start .go[disabled] { opacity:.5; cursor:progress; }
+  #start .prog { width:280px; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden; }
+  #start .prog i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  #start small { opacity:.5; font-size:11px; max-width:620px; line-height:1.7; }
+  body.started #start { opacity:0; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="title" class="hud panel"><b>疯狂动物城 · ZOOTOPIA</b><span>上海迪士尼乐园第八主题园区 · 虚拟游览</span></div>
+<div id="poi" class="hud panel"></div>
+<div id="bar" class="hud">
+  <button id="btnTime" title="切换白天 / 黄昏 / 夜晚 (N)">☀ 白天</button>
+  <button id="btnTour" title="沿大马路自动游览 (T)">▶ 自动游览</button>
+  <button id="btnView" title="俯瞰 / 步行 (O)">⛶ 俯瞰</button>
+</div>
+<div id="help" class="hud panel">
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 行走　<kbd>Shift</kbd> 快走　鼠标 环视（或按住拖动）<br>
+  <kbd>N</kbd> 白天 / 黄昏 / 夜晚　<kbd>T</kbd> 自动游览　<kbd>O</kbd> 俯瞰　<kbd>M</kbd> 地图　<kbd>Esc</kbd> 释放鼠标<br>
+  <kbd>R</kbd> 卡住时回到路上　<kbd>F</kbd> 烟花开 / 关（夜晚，城堡方向）　<span id="fps" style="opacity:.7"></span>
+</div>
+<div id="map" class="hud panel" title="点击地图瞬移"><canvas width="460" height="380"></canvas></div>
+<div id="cross" class="hud"></div>
+
+<div id="start">
+  <h1>疯狂动物城</h1>
+  <p>上海迪士尼乐园「疯狂动物城」主题园区的可游览三维模型。<br>平面布局取自 OpenStreetMap 实测轮廓，外观依据公开实拍照片还原，可切换白天、黄昏与夜晚。</p>
+  <div class="prog"><i id="progBar"></i></div>
+  <button class="go" id="btnGo" disabled>加载中…</button>
+  <small id="gpu" style="opacity:.75"></small>
+  <small>非官方爱好者还原，仅供个人游览参考。Zootopia / 疯狂动物城及相关名称归 Disney 所有；本模型不含官方角色形象与商标图案。</small>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+The buildings touch each other and fill the full width of the image from the left edge to the right edge. Their bases sit exactly on the bottom edge of the image (no pavement, no ground strip, no plants in front). Even soft overcast daylight, no cast shadows onto the background, no people, no animals, no characters, no readable text, no logos, no lettering on signs.
+Background everywhere above and around the rooflines: perfectly flat solid pure magenta (#FF00FF), nothing else in it (no sky, no clouds, no gradient). Landscape 3:2 format.

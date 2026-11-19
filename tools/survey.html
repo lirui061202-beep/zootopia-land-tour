@@ -1,0 +1,76 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>survey</title>
+<style>
+  html, body { margin: 0; background: #222; overflow: hidden; font: 11px Arial, sans-serif; }
+  #wrap { position: absolute; left: 0; top: 0; }
+  #wrap img { position: absolute; image-rendering: auto; }
+  svg { position: absolute; left: 0; top: 0; }
+  #info { position: fixed; left: 4px; bottom: 4px; color: #fff; background: rgba(0,0,0,.6); padding: 2px 6px; }
+</style>
+<div id="wrap"></div>
+<div id="info"></div>
+<script type="module">
+// 测量页：卫星图（Esri World Imagery）上叠加模型的平面布局和米制网格，用来核对建筑、摊位、座椅的位置。
+// 参数：?cx=&cy=（视野中心，模型坐标，米）&ppm=（每米多少像素）&z=（瓦片级别）&layers=grid,model,osm
+import { FACADES, BLOCKS, ROAD, ROAD_HALF, CIRCLE, ZPD, ZOOTRON, LAND, WALLS, SPUR, MEDIAN } from '../src/layout.js';
+import { OSM } from '../src/osm.js';
+const q = new URLSearchParams(location.search);
+const cx = +(q.get('cx') ?? 0), cy = +(q.get('cy') ?? -30), z = +(q.get('z') ?? 19);
+const GOOGLE = q.get('src') === 'g';          // 用谷歌地图的嵌入页做底图（卫星图层），比例由级别决定
+const MAG = +(q.get('mag') ?? 1);                 // 谷歌嵌入页最高只到 20 级，再放大靠 CSS 缩放
+const ppm = GOOGLE ? MAG * (256 * 2 ** z) / (40075016.686 * Math.cos((31.1485702 * Math.PI) / 180)) : +(q.get('ppm') ?? 6);
+const layers = (q.get('layers') ?? 'grid,model').split(',');
+const LAT0 = 31.1485702, LON0 = 121.6554277, MLAT = 110900, MLON = 95300;
+const W = innerWidth, H = innerHeight;
+const N = 256 * 2 ** z;
+const mercX = (lon) => ((lon + 180) / 360) * N;
+const mercY = (lat) => { const r = (lat * Math.PI) / 180; return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * N; };
+// 模型坐标 → 屏幕像素
+const mx0 = mercX(LON0 + cx / MLON), my0 = mercY(LAT0 + cy / MLAT);
+const mppx = (mercX(LON0 + 1 / MLON) - mercX(LON0));          // 每米多少瓦片像素（东西向）
+const s = ppm / mppx;                                           // 瓦片像素 → 屏幕像素
+const X = (x) => W / 2 + (mercX(LON0 + x / MLON) - mx0) * s;
+const Y = (y) => H / 2 + (mercY(LAT0 + y / MLAT) - my0) * s;
+const wrap = document.getElementById('wrap');
+const tx0 = Math.floor((mx0 - W / 2 / s) / 256), tx1 = Math.floor((mx0 + W / 2 / s) / 256);
+const ty0 = Math.floor((my0 - H / 2 / s) / 256), ty1 = Math.floor((my0 + H / 2 / s) / 256);
+let pending = 0, failed = 0;
+if (GOOGLE) {
+  const f = document.createElement('iframe');
+  f.src = `https://maps.google.com/maps?ll=${(LAT0 + cy / MLAT).toFixed(7)},${(LON0 + cx / MLON).toFixed(7)}&t=k&z=${z}&output=embed`;
+  f.style.cssText = `position:absolute;left:0;top:0;width:${W / MAG}px;height:${H / MAG}px;border:0;transform:scale(${MAG});transform-origin:0 0`;
+  wrap.appendChild(f);
+} else
+for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) {
+  const im = new Image(); pending++;
+  im.onload = () => { pending--; upd(); }; im.onerror = () => { pending--; failed++; upd(); };
+  im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`;
+  im.style.left = (W / 2 + (tx * 256 - mx0) * s) + 'px'; im.style.top = (H / 2 + (ty * 256 - my0) * s) + 'px';
+  im.style.width = im.style.height = (256 * s + 0.5) + 'px';
+  wrap.appendChild(im);
+}
+const upd = () => { document.getElementById('info').textContent = `z${z} ppm${ppm} centre ${cx},${cy} · tiles pending ${pending} failed ${failed} · Imagery © Esri, Maxar`; window.__ready = pending === 0; };
+upd();
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('width', W); svg.setAttribute('height', H); document.body.appendChild(svg);
+const el = (n, a, t) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (t) e.textContent = t; svg.appendChild(e); return e; };
+const path = (pts, stroke, w = 1.5, close = false, dash = null) => el('path', { d: pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ') + (close ? 'Z' : ''), fill: 'none', stroke, 'stroke-width': w, ...(dash ? { 'stroke-dasharray': dash } : {}) });
+if (layers.includes('grid')) {
+  const step = ppm >= 10 ? 5 : 10;
+  const x0 = Math.floor((cx - W / 2 / ppm) / step) * step, y0 = Math.floor((cy - H / 2 / ppm) / step) * step;
+  for (let x = x0; x <= cx + W / 2 / ppm; x += step) { el('line', { x1: X(x), y1: 0, x2: X(x), y2: H, stroke: 'rgba(255,255,255,.45)', 'stroke-width': x % 50 === 0 ? 1.4 : 0.6 }); el('text', { x: X(x) + 2, y: 11, fill: '#fff', stroke: '#000', 'stroke-width': 2.5, 'paint-order': 'stroke' }, x); }
+  for (let y = y0; y <= cy + H / 2 / ppm; y += step) { el('line', { x1: 0, y1: Y(y), x2: W, y2: Y(y), stroke: 'rgba(255,255,255,.45)', 'stroke-width': y % 50 === 0 ? 1.4 : 0.6 }); el('text', { x: 2, y: Y(y) - 2, fill: '#fff', stroke: '#000', 'stroke-width': 2.5, 'paint-order': 'stroke' }, y); }
+}
+if (layers.includes('osm')) for (const k of ['central', 'west', 'westN', 'east', 'ride', 'rotunda', 'station', 'park', 'hutA', 'hutB', 'maneStreet', 'wallA', 'wallB']) if (OSM[k]) path(OSM[k], '#35e0ff', 1, false, '4 3');
+if (layers.includes('model')) {
+  for (const b of Object.values(BLOCKS)) path(b, '#ff9a2e', 1.2, true);
+  for (const f of FACADES) { path([f.a, f.b], '#ff2a2a', 2.4); el('text', { x: (X(f.a[0]) + X(f.b[0])) / 2, y: (Y(f.a[1]) + Y(f.b[1])) / 2, fill: '#ffef5a', stroke: '#000', 'stroke-width': 2.5, 'paint-order': 'stroke' }, f.id); }
+  path(ROAD, '#ffe600', 1.6); if (SPUR) path(SPUR, '#ffe600', 1.2); if (MEDIAN) path(MEDIAN, '#fff', 2);
+  for (const w of WALLS) path(w, '#ff66ff', 1.4);
+  const circ = (c, rx, ry, col) => el('ellipse', { cx: X(c[0]), cy: Y(c[1]), rx: rx * ppm, ry: ry * ppm, fill: 'none', stroke: col, 'stroke-width': 1.6 });
+  circ(CIRCLE.c, CIRCLE.rIn * (CIRCLE.sx || 1), CIRCLE.rIn * (CIRCLE.sy || 1), '#7dff5a'); circ(ZPD.c, ZPD.r, ZPD.r, '#ff2a2a'); circ(ZOOTRON.c, ZOOTRON.r, ZOOTRON.r, '#ff2a2a');
+  const pts = (q.get('pts') || '').split(';').filter(Boolean).map((p) => p.split(',').map(Number));
+  for (const p of pts) el('circle', { cx: X(p[0]), cy: Y(p[1]), r: 4, fill: 'none', stroke: '#00ffd0', 'stroke-width': 2 });
+}
+</script>

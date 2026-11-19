@@ -1,0 +1,8 @@
+Generate one image: a sheet of SIX separate square panels arranged in a neat grid of 3 columns by 2 rows, filling the whole image edge to edge, each panel exactly one sixth of the image. Every panel has a perfectly flat solid pure magenta (#FF00FF) background with nothing else in it and contains ONE cut-out piece of vegetation laid flat and seen straight on, centred with a clear magenta margin all around, evenly lit with no cast shadow, in a slightly stylized 3D-animated-film look with crisp leaf edges. No pots, no ground, no text.
+Panels, left to right, top row then bottom row:
+1. A dense spray of deciduous tree twigs completely covered with fresh mid-green oval leaves, roughly round in outline.
+2. Another dense leafy spray of twigs with lighter yellow-green leaves, roughly round in outline, a different shape from the first.
+3. A flat conifer bough (cypress-like) with dense dark blue-green scale foliage, fan shaped.
+4. A camellia shrub branch: many glossy dark-green leaves with six bright red camellia flowers with yellow centres.
+5. A rounded tuft of garden flowers: purple, pink and yellow blooms packed together with small green leaves.
+6. A desert agave succulent rosette with thick blue-green pointed leaves, seen from the side.

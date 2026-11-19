@@ -1,0 +1,7 @@
+Generate one image. Orthographic front elevations (perfectly flat, straight-on, no perspective) of FOUR separate small street-market shacks standing side by side with clear empty gaps of background between them so that none touch, as physically built in a high-end theme park from a stylized 3D animated film about a city of animals: playful rounded shapes, saturated colours, believable painted wood, canvas and metal.
+1 (leftmost): a drinks shack in fresh green and yellow, a big leaf-shaped canvas awning, glass juice dispensers and stacked cups on the counter, a blank wooden signboard on top.
+2: a rustic farm stand of weathered timber with an orange-and-cream striped awning, crates of corn cobs, carrots and pumpkins, a brass popcorn kettle behind glass, a blank hand-painted signboard on top.
+3: a pastel pink and baby-blue candy cart on two big spoked wheels, a scalloped canopy trimmed with fluffy cloud shapes, bags of cotton candy hanging in rows, a blank oval sign.
+4 (rightmost): an ice-lolly cart in crimson red and cream with a deep red awning with a cream wavy dripping edge, a chest freezer with a chrome lid, a rack of big red paw-print-shaped ice lollies on sticks, a blank red signboard on posts.
+Each shack is about as wide as it is tall. Every base sits exactly on the bottom edge of the image. Even soft daylight, no cast shadows on the background, no people, no animals, no characters, no readable text, no logos.
+Background everywhere, including the gaps between the shacks: perfectly flat solid pure magenta (#FF00FF). Landscape 3:2 format.

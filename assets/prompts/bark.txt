@@ -1,0 +1,1 @@
+Generate one image. A seamless tileable texture (it must tile perfectly on all four edges), square, evenly lit flat albedo with no strong shadows: warm brown tree bark with soft vertical ridges and shallow furrows, slightly stylized like a 3D animated film, uniform across the image. No moss, no objects, no text.

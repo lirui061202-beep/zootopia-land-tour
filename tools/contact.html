@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>texture contact sheet</title>
+<style>body{margin:0;background:#222;color:#fff;font:12px sans-serif}#g{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:6px}canvas{width:100%;display:block}</style>
+<div id="g"></div>
+<script>
+// usage: contact.html?names=a,b,c  - draws each assets/tex/<name>.png with a 0.1 UV grid (u left->right, v bottom->top)
+const names = (new URLSearchParams(location.search).get('names') || '').split(',').filter(Boolean);
+for (const n of names) {
+  const im = new Image();
+  im.onload = () => {
+    const W = 640, H = Math.round(W * im.height / im.width), c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'); g.drawImage(im, 0, 0, W, H);
+    g.font = 'bold 11px sans-serif';
+    for (let i = 1; i < 10; i++) {
+      g.strokeStyle = i === 5 ? 'rgba(0,0,0,.75)' : 'rgba(0,0,0,.38)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(W * i / 10, 0); g.lineTo(W * i / 10, H); g.stroke();
+      g.beginPath(); g.moveTo(0, H * i / 10); g.lineTo(W, H * i / 10); g.stroke();
+      g.fillStyle = '#000'; g.fillRect(W * i / 10 - 9, 0, 18, 12); g.fillRect(0, H * i / 10 - 6, 18, 12);
+      g.fillStyle = '#ff0'; g.fillText('.' + i, W * i / 10 - 7, 10); g.fillText('.' + (10 - i), 2, H * i / 10 + 4);
+    }
+    g.fillStyle = '#000'; g.fillRect(W - 90, H - 16, 90, 16); g.fillStyle = '#0f0'; g.fillText(n, W - 86, H - 4);
+    document.getElementById('g').appendChild(c);
+  };
+  im.src = '../assets/tex/' + n + '.png';
+}
+</script>
