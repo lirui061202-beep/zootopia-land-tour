@@ -191,6 +191,7 @@ export class Walker {
 
   update(dt) {
     if (this.mode === 'orbit') { this.orbit.update(); return; }
+    if (this.mode === 'cine') return;              // 录像时镜头由脚本直接摆（tools/rec-shots.js）
     let moving = 0;
     if (this.mode === 'tour') {
       const P = this.tourPath;

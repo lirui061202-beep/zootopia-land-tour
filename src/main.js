@@ -287,6 +287,7 @@ async function boot() {
   let last = performance.now();
   const loop = (now) => {
     const raw = now - last, dt = Math.min(0.05, raw / 1000); last = now;
+    if (window.__cine) { requestAnimationFrame(loop); return; }      // 逐帧录像时由录制脚本推进画面
     step(dt); render();
     if (document.visibilityState === 'visible' && raw < 500) adapt(raw);
     requestAnimationFrame(loop);
