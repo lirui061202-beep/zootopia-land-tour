@@ -47,6 +47,29 @@ function asphaltTex() {
   });
 }
 
+// 草地：深浅不一的草斑 + 一根根短草叶，可平铺。原来草地是一种纯绿色，俯看是一大片色块
+function grassTex() {
+  const rnd = mulberry32(31), S = 512;
+  return canvas(S, S, (g) => {
+    g.fillStyle = '#6a9453'; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * S, y = rnd() * S, r = 30 + rnd() * 80, c = rnd() < 0.5 ? '84,122,66' : rnd() < 0.5 ? '128,160,92' : '100,140,74';
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); gr.addColorStop(0, 'rgba(' + c + ',.5)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
+        g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+    g.lineCap = 'round';
+    for (let i = 0; i < 5200; i++) {
+      const x = rnd() * S, y = rnd() * S, l = 4 + rnd() * 7, a = -Math.PI / 2 + (rnd() - 0.5) * 1.3, k = rnd();
+      g.strokeStyle = k < 0.4 ? 'rgba(70,108,56,.55)' : k < 0.8 ? 'rgba(132,168,98,.5)' : 'rgba(166,186,112,.45)'; g.lineWidth = 1 + rnd() * 1.2;
+      // 靠近边缘的草叶在对边再画一份，平铺时接缝处不会出现一道道稀疏的线
+      const edge = x < 14 || x > S - 14 || y < 14 || y > S - 14;
+      for (const ox of edge ? [-S, 0, S] : [0]) for (const oy of edge ? [-S, 0, S] : [0]) { g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke(); }
+    }
+  });
+}
+
 const imgCanvas = (im, S) => canvas(S, S, (g) => g.drawImage(im, 0, 0, S, S));
 
 function roadTex(base) {      // 横向 = 路宽，纵向 = 8 米一段
@@ -144,7 +167,9 @@ export function buildGround(scene, tex) {
   // 环岛中心岛
   const isl = new THREE.Mesh(new THREE.CylinderGeometry(CIRCLE.rIn, CIRCLE.rIn + 0.15, 0.55, 48), rockMat);
   isl.position.set(CIRCLE.c[0], 0.275, -CIRCLE.c[1]); isl.scale.set(CIRCLE.sx || 1, 1, CIRCLE.sy || 1); isl.castShadow = isl.receiveShadow = true; G.add(isl);
-  const grassMat = new THREE.MeshStandardMaterial({ color: 0x5fa043, roughness: 1, side: THREE.DoubleSide });
+  const grassC = grassTex();
+  const grassT = canvasTex(grassC, { repeat: [1, 1] }); grassT.wrapS = grassT.wrapT = THREE.RepeatWrapping;
+  const grassMat = new THREE.MeshStandardMaterial({ map: grassT, normalMap: nrm(grassC, 1.6), normalScale: new THREE.Vector2(0.5, 0.5), color: 0xf2ffe6, roughness: 1, side: THREE.DoubleSide });
   const islTop = new THREE.Mesh(new THREE.CircleGeometry(CIRCLE.rIn - 0.35, 48), grassMat);
   islTop.rotation.x = -Math.PI / 2; islTop.position.set(CIRCLE.c[0], 0.56, -CIRCLE.c[1]); islTop.scale.set(CIRCLE.sx || 1, CIRCLE.sy || 1, 1); islTop.receiveShadow = true; G.add(islTop);
   G.userData.grassMat = grassMat;
@@ -196,7 +221,19 @@ export function buildGround(scene, tex) {
   const lawn = new THREE.Mesh(polyFlat(PARK, 0.61, 3), grassMat); lawn.receiveShadow = true; G.add(lawn);
 
   // 7. 园区外围草地（南侧、东侧），让视线越过围墙时不穿帮
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), new THREE.MeshStandardMaterial({ color: 0x6f9a52, roughness: 1 }));
+  const outerT = canvasTex(grassC, { repeat: [150, 150] }); outerT.wrapS = outerT.wrapT = THREE.RepeatWrapping;
+  // 大片草地再叠一层几十米尺度的深浅变化（顶点色），远看不是一张均匀重复的地毯
+  const outerG = new THREE.PlaneGeometry(700, 700, 56, 56);
+  { const rnd = mulberry32(77), p = outerG.attributes.position, col = new Float32Array(p.count * 3);
+    const ph = [rnd() * 6, rnd() * 6, rnd() * 6, rnd() * 6];
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i);
+      const n = Math.sin(x * 0.031 + ph[0]) * Math.cos(y * 0.027 + ph[1]) * 0.5 + Math.sin(x * 0.011 + y * 0.017 + ph[2]) * 0.35 + (rnd() - 0.5) * 0.3;
+      const k = 0.9 + n * 0.13;
+      col[i * 3] = k * (1 + n * 0.05); col[i * 3 + 1] = k; col[i * 3 + 2] = k * (1 - n * 0.06);
+    }
+    outerG.setAttribute('color', new THREE.BufferAttribute(col, 3)); }
+  const outer = new THREE.Mesh(outerG, new THREE.MeshStandardMaterial({ map: outerT, color: 0xe6efdc, roughness: 1, vertexColors: true }));
   outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05; outer.receiveShadow = true; G.add(outer);
 
   scene.add(G);

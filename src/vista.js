@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mulberry32, pointInPoly } from './util.js';
 import { blobGeo, instanced, PROP_MATS } from './props.js';
-import { deciduous, shrub, cutMat } from './flora.js';
+import { deciduous, shrub, cutMat, coreMaterial } from './flora.js';
 import { CASTLE, DIR, at } from './fireworks.js';
 import { LAND, BLOCKS } from './layout.js';
 import { sightCap } from './sight.js';
@@ -73,12 +73,14 @@ export function buildVista(scene, env, { sheet = null, fw = null } = {}) {
     };
     // 南面：离围墙近的矮一些，免得把城堡全挡住（真实的树也只挡得住城堡的下半截）
     for (let i = 0; i < 340; i++) { const y = -100 - rnd() * 200, x = -185 + rnd() * 370; put(x, y, 1.25 + rnd() * 0.6 + Math.min(0.5, (-y - 100) / 300)); }
-    for (let i = 0; i < 170; i++) { const a = rnd() * Math.PI * 2, r = 105 + rnd() * 130; put(Math.cos(a) * r, -20 + Math.sin(a) * r * 0.9, 1.4 + rnd() * 0.9); }
+    // 南墙外紧贴着的两排密植：树冠连成一条林线。没有它们，从园内望城堡时看到的是后面一棵棵压矮了的孤树（像棒棒糖）
+    for (let x = -72; x <= 92; x += 3.1) for (const y0 of [-97, -104.5, -112]) put(x + rnd() * 2, y0 - rnd() * 5, 0.78 + rnd() * 0.62);
+    // 原来园区四周还撒了一圈稀疏的树：从街上看不到，俯瞰时却是一棵棵孤零零立在空地上，很粗糙，已去掉。
     const trunk = new THREE.CylinderGeometry(0.12, 0.2, 3.2, 6).translate(0, 1.6, 0);
     if (leafA && leafB) {
-      // 和园区里的行道树同一套枝叶卡片，只是卡片少一些、不做枝干：远看是同一种树
-      const kinds = [deciduous(41, { nCards: 46 }), deciduous(42, { height: 6.9, spread: 2.9, nCards: 54 })];
-      const coreMat = new THREE.MeshStandardMaterial({ color: 0x2c5a26, roughness: 1 });
+      // 和园区里的行道树同一套枝叶卡片，不做枝干：远看是同一种树
+      const kinds = [deciduous(41, { nCards: 84 }), deciduous(42, { height: 6.9, spread: 2.9, nCards: 96 })];
+      const coreMat = coreMaterial();
       for (const list of Object.values(sectors)) {
         if (!list.length) continue;
         kinds.forEach((k, v) => {
@@ -92,6 +94,19 @@ export function buildVista(scene, env, { sheet = null, fw = null } = {}) {
       const crown = blobGeo(11, 2.6, 2, 0.26).translate(0, 4.6, 0);
       for (const list of Object.values(sectors)) if (list.length) G.add(instanced(crown, leaf, list, false), instanced(trunk, PROP_MATS.trunk, list, false));
     }
+    // 林下灌木丛：围墙外到林带之间、以及林带的树干之间填满一人多高的灌木。
+    // 没有它，镜头升高一点就能看到林带下面是一片空地和一根根树干。高度同样不超过望向城堡的视线。
+    if (leafA) {
+      const big = shrub(31, { r: 1.5, h: 2.6, n: 30 }), thick = [];
+      for (let x = -78; x <= 96; x += 2.5) for (let y = -68; y >= -116; y -= 2.5) {
+        const px = x + (rnd() - 0.5) * 1.8, py = y + (rnd() - 0.5) * 1.8;
+        if (near(px, py, 4)) continue;
+        const h = Math.min(sightCap(px, py, 2.0) * 0.85, 2.6 + rnd() * 2.4);
+        if (h < 1.2) continue;
+        thick.push({ x: px, z: py, y: 0, s: h / 2.6, ry: rnd() * 6.3 });
+      }
+      G.add(instanced(big.core, coreMaterial(null, 0x6f9460), thick, false), instanced(big.cards, leafA, thick, false));
+    }
     // 绿地南缘的一道矮绿篱：挡住围界外空荡荡的地面，又不挡城堡（高约 2.2 米）
     {
       const edge = [[-6.5, -62.5], [0.8, -66], [14, -68.3], [26.1, -64], [42.2, -64], [52, -61], [58, -54.5]];
@@ -101,7 +116,7 @@ export function buildVista(scene, env, { sheet = null, fw = null } = {}) {
         for (let d = 0; d < L; d += 1.25) { const t = d / L, k = (hedge.length * 0.37) % 1; hedge.push({ x: ax + (bx - ax) * t, z: ay + (by - ay) * t - k * 0.5, y: 0, s: 1.25 + k * 0.3, ry: hedge.length * 1.7 }); }
       }
       const sb = shrub(23, { r: 1.05, h: 1.75, n: 24 });
-      G.add(instanced(sb.core, new THREE.MeshStandardMaterial({ color: 0x2f6a2c, roughness: 1 }), hedge, false));
+      G.add(instanced(sb.core, coreMaterial(null, 0x6f9460), hedge, false));
       if (leafA) G.add(instanced(sb.cards, leafA, hedge, false));
     }
     G.traverse((o) => { if (o.isInstancedMesh) o.receiveShadow = false; });

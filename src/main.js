@@ -117,7 +117,8 @@ async function boot() {
     }
     // 遮蔽默认会把整个场景再画一遍（只为了拿深度和法线）——等于每帧两遍几何。
     // 改成直接读主画面刚画好的深度图，法线由深度推算：整整省掉一遍场景绘制和一半的绘制调用。
-    if (!ULTRA) {
+    // （?ultra 也走这条路：遮蔽自己另画法线时不认镂空和透明，字牌背后会多出一块灰色矩形，树叶卡片也会被当成实心方片）
+    {
       gtao._renderGBuffer = false;
       for (const m of [gtao.gtaoMaterial, gtao.pdMaterial]) { m.defines.NORMAL_VECTOR_TYPE = 0; m.defines.DEPTH_SWIZZLING = 'x'; m.uniforms.tNormal.value = null; m.needsUpdate = true; }
       gtao.normalRenderTarget.dispose();
@@ -130,23 +131,32 @@ async function boot() {
     composer.addPass(gtao);
   }
   const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.1, 0.6, 0.95);
+  // 自带的泛光把高斯核在 1 个标准差处就截断了，几乎等于方框模糊：很亮的小光点（礼花炸点）会晕出方形的光斑。
+  // 这里换成在 2 个标准差处截断的系数（着色器里会自行归一化），光晕变圆。
+  for (const m of bloom.separableBlurMaterials) {
+    const R = m.defines.KERNEL_RADIUS, sg = R / 2;
+    m.uniforms.gaussianCoefficients.value = Array.from({ length: R }, (_, i) => Math.exp(-0.5 * i * i / (sg * sg)));
+  }
   composer.addPass(bloom);
   // 体积光（丁达尔光）：从每个像素朝太阳方向取样，把天空里够亮的部分拉成光束，被建筑挡住的地方自然留下暗纹
   const rays = new ShaderPass({
+    defines: { RAY_N: ULTRA ? 96 : 32 },
     uniforms: { tDiffuse: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.8) }, uAmt: { value: 0 }, uTint: { value: new THREE.Color(1, 0.92, 0.78) } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uAmt; uniform vec3 uTint; varying vec2 vUv;
       void main(){
         vec4 base = texture2D(tDiffuse, vUv);
         if (uAmt < 0.002) { gl_FragColor = base; return; }
-        vec2 stepv = (uSun - vUv) * (0.92 / 22.0); vec2 p = vUv; float w = 1.0; vec3 acc = vec3(0.0);
-        for (int i = 0; i < 22; i++) {
+        // 每个像素的起点错开一点（抖动），再配上足够多的采样：否则亮的云边和塔楼会被拉成一串错位的重影，像天上飘着带棱角的碎片
+        vec2 stepv = (uSun - vUv) * (0.92 / float(RAY_N)); float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        vec2 p = vUv + stepv * jit; float w = 1.0; float dec = pow(0.955, 22.0 / float(RAY_N)); vec3 acc = vec3(0.0);
+        for (int i = 0; i < RAY_N; i++) {
           p += stepv;
           vec3 s = texture2D(tDiffuse, clamp(p, 0.001, 0.999)).rgb;
           float l = max(s.r, max(s.g, s.b));
-          acc += s * smoothstep(1.05, 2.4, l) * w; w *= 0.955;
+          acc += s * smoothstep(1.05, 2.4, l) * w; w *= dec;
         }
-        gl_FragColor = vec4(base.rgb + acc * uTint * (uAmt / 22.0), base.a);
+        gl_FragColor = vec4(base.rgb + acc * uTint * (uAmt / float(RAY_N)), base.a);
       }`,
   });
   rays.enabled = !FAST;
@@ -154,8 +164,10 @@ async function boot() {
   composer.addPass(new OutputPass());
   // 调色：动画电影式的通透高饱和——先提「自然饱和度」（灰的颜色提得多、已经很艳的提得少），
   // 再做暖高光 / 冷阴影的分离调色、柔和的 S 曲线、一点点抬黑和暗角；黄昏时整体更暖更紫
+  // 饱和度：原来是 1.12 / 0.4，整体太艳（贴图本身已经很鲜），降到略低于原片
+  const SAT = 0.9, VIB = 0.1;
   const grade = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uSat: { value: 1.12 }, uVib: { value: 0.4 }, uNight: { value: 0 }, uDusk: { value: 0 } },
+    uniforms: { tDiffuse: { value: null }, uSat: { value: SAT }, uVib: { value: VIB }, uNight: { value: 0 }, uDusk: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat; uniform float uVib; uniform float uNight; uniform float uDusk; varying vec2 vUv;
       void main(){
@@ -178,7 +190,7 @@ async function boot() {
   env.onChange((e) => {
     const k = env.dusk;
     grade.uniforms.uNight.value = e; grade.uniforms.uDusk.value = k;
-    grade.uniforms.uSat.value = 1.12 - e * 0.04; grade.uniforms.uVib.value = 0.4 - e * 0.15;
+    grade.uniforms.uSat.value = SAT - e * 0.02; grade.uniforms.uVib.value = VIB - e * 0.05;
     // 白天也留一层柔光（亮部微微晕开），黄昏和夜晚更强
     bloom.strength = 0.2 + k * 0.16 + e * 0.24; bloom.threshold = 0.9 - e * 0.1; bloom.radius = 0.62 + e * 0.12;
     rays.uniforms.uTint.value.setRGB(1, 0.92 - k * 0.3, 0.78 - k * 0.42);
@@ -359,7 +371,7 @@ async function boot() {
 
   if (DEBUG) {
     document.body.classList.add('started');
-    window.T = { scene, camera, renderer, composer, env, walker, ui, B, fw, vista, lightPool, marks, step, render, THREE,
+    window.T = { scene, camera, renderer, composer, grade, bloom, env, walker, ui, B, fw, vista, lightPool, marks, step, render, THREE,
       frame(dt = 0.016, n = 1) { for (let i = 0; i < n; i++) step(dt); render(); },
       night(on) { this.time(on ? 1 : 0); },
       time(t) { env.target = t; env.apply(t); setTimeBtn(); step(0); render(); },

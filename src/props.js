@@ -8,7 +8,7 @@ import * as S from './signs.js';
 import { drawArt } from './art.js';
 import { placeAB, normalCanvas } from './facade.js';
 import { cutWhole } from './art.js';
-import { deciduous, shrub, cutMat, crossed } from './flora.js';
+import { deciduous, shrub, cutMat, crossed, coreMaterial, conifer, ivyWall } from './flora.js';
 import { sightCap } from './sight.js';
 
 export const GREEN = 0x2f9e63, GOLD = 0xc9a23a;
@@ -380,6 +380,8 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
     if (inBlock(x, y, 3.2) || pointInPoly(x, y, PARK) || Math.hypot(x - CIRCLE.c[0], y - CIRCLE.c[1]) < CIRCLE.rOut * (CIRCLE.sy || 1) + 0.5) continue;
     treeLists[i % 3].push({ x, z: y, ry: rnd() * 6, s: 0.8 + rnd() * 0.25 });
   }
+  // 入口左手边、露露精品店西侧露出来的一段街区后墙：种三棵树挡一挡（实景里这类后场墙面也是靠绿化遮的）
+  [[-60.5, -52.2, 1.2], [-57.4, -51.8, 1.32], [-54.4, -51.4, 1.15]].forEach(([x, y, s], i) => treeLists[i % 3].push({ x, z: y, ry: i * 2.1, s }));
   // 绿地里的树（遮挡矿山车一侧）
   let tries = 0, placed = 0;
   while (placed < 34 && tries++ < 800) {
@@ -400,7 +402,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
   const leafA = cutMat('leafA'), leafB = cutMat('leafB');
   if (leafA && leafB) {
     // 枝叶卡片树：树干 + 主枝 + 深色内核 + 两种枝叶卡片，三种树形
-    const coreMat = new THREE.MeshStandardMaterial({ color: 0x2c5a26, roughness: 1 });
+    const coreMat = coreMaterial(tex.foliage);
     const kinds = [deciduous(1), deciduous(2, { height: 6.9, spread: 2.9, nCards: 130 }), deciduous(3, { height: 5.5, spread: 2.2, nCards: 95 })];
     const lists = [treeLists[0].slice(), treeLists[1].slice(), treeLists[2].slice()];
     farLists.flat().forEach((t, i) => lists[i % 3].push({ ...t, s: t.s * 0.82 }));
@@ -424,7 +426,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
 
   // 棕榈（撒哈拉广场的暗示）：车站旁、环岛中心、警局两侧
   let frondTex = null;
-  if (tex.frond) { frondTex = new THREE.CanvasTexture(cutWhole(tex.frond)); frondTex.colorSpace = THREE.SRGBColorSpace; frondTex.anisotropy = 8; }
+  if (tex.frond) { frondTex = new THREE.CanvasTexture(cutWhole(tex.frond, true)); frondTex.colorSpace = THREE.SRGBColorSpace; frondTex.anisotropy = 8; }
   const palmMat = new THREE.MeshStandardMaterial({ color: frondTex ? 0xffffff : 0x4f9a3a, map: frondTex, alphaTest: frondTex ? 0.4 : 0, roughness: 0.75, side: THREE.DoubleSide });
   [[-43.5, -11.5, 8.5, 1], [-11.5, -4.4, 7, 3], [11.0, -10.8, 8, 4], [22.6, -11.6, 6, 5], [58, -41, 7.5, 6], [-52, -62, 8, 7]].forEach(([x, y, h, s]) => {
     solid.circles.push([x, y, 0.2]);
@@ -437,7 +439,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
   // 环岛中心岛：花丛 + 红色小消防栓
   const flowerMat = [0xe84a6f, 0xf2b12e, 0xb05ad0].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
   const flowersM = cutMat('flowers'), camelliaM = cutMat('camellia'), agaveM = cutMat('agave');
-  const shrubCore = new THREE.MeshStandardMaterial({ color: 0x2f6a2c, roughness: 1 });
+  const shrubCore = coreMaterial(tex.foliage, 0x6f9460);
   if (flowersM) {
     const fl = shrub(5, { r: 0.62, h: 0.7, n: 20 }), list = [];
     for (let i = 0; i < 26; i++) { const a = (i / 26) * Math.PI * 2, r = 1.5 + (i % 3) * 0.85; list.push({ x: CIRCLE.c[0] + Math.cos(a) * r, z: CIRCLE.c[1] + Math.sin(a) * r, y: 0.5, s: 0.85 + (i % 4) * 0.12, ry: i * 1.3 }); }
@@ -453,6 +455,25 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
     const cm = shrub(9, { r: 0.85, h: 1.35, n: 30 });
     const list = [[-35.2, -49.4], [-42.4, -15.0], [-43.2, -7.8], [-9.4, -26.9], [23.4, -24.7], [-53.0, -66.5], [-39.5, -74.5], [57.0, -42.5], [63.6, -45.6], [-36.9, -4.2]].map(([x, y], i) => ({ x, z: y, s: 0.9 + (i % 3) * 0.14, ry: i * 2.1 }));
     G.add(instanced(cm.core, shrubCore, list), instanced(cm.cards, camelliaM, list));
+  }
+  // 公寓群背面朝绿地的一段后墙没有立面，是一面 7 米高的素墙（从警局前望向城堡时正好在画面右侧）：贴墙种一排柏树遮住
+  {
+    const cm = cutMat('conifer');
+    if (cm) {
+      const cf = conifer(7, { height: 6.6, base: 1.25 }), list = [];
+      const a = [-8.2, -45.8], b = [-4.4, -60.2], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      for (let d = 1.1; d < L - 0.4; d += 1.85) {
+        const t = d / L, x = a[0] + (b[0] - a[0]) * t + 1.25, y = a[1] + (b[1] - a[1]) * t + 0.33, k = (list.length * 0.37) % 1;
+        list.push({ x, z: y, y: pointInPoly(x, y, PARK) ? 0.58 : 0, s: 0.95 + k * 0.3, ry: list.length * 1.9 });
+      }
+      G.add(instanced(cf.core, new THREE.MeshStandardMaterial({ color: 0x1f4a2c, roughness: 1 }), list), instanced(cf.trunk, M.trunk, list), instanced(cf.cards, cm, list));
+      // 柏树之间和树尖上方还是会露出墙面和平直的屋檐线：整面墙再爬满藤叶，叶子略高出檐口
+      const lm = cutMat('leafA');
+      if (lm) {
+        const iv = ivyWall(L, 7.7, 5);
+        for (const [geo, mat] of [[iv.back, coreMaterial(null, 0x4f6a45)], [iv.cards, lm]]) { const m = new THREE.Mesh(geo, mat); placeAB(m, b, a); m.castShadow = m.receiveShadow = true; G.add(m); }
+      }
+    }
   }
   if (agaveM) {                // 龙舌兰：警局砂岩脚下、绿地的岩石路缘
     const ag = crossed(1.15, 1.25);
@@ -620,7 +641,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
     // 自西向东：树懒冰沙、霍普斯爆米花、大象甜品店爪爪冰棍、咩花糖；冰棍摊东头立着巨型爪爪冰棍。
     { p: [33.4, -45.9], name: 'SLOTHFUL SLURPS', sub: '饮品', style: 'cream' },
     { p: [36.3, -45.9], name: 'HOPPS FAMILY FARM', sub: '爆米花', style: 'dark' },
-    { p: [43.2, -45.7], name: 'COTTONBALL CANDY', sub: '咩花糖', style: 'purple' },
+    { p: [43.2, -45.7], name: 'COTTONBALL CANDY', sub: '咩花糖', style: 'purple', signW: 1.12, signDy: -0.27 },   // 字放进推车顶上那块椭圆招牌里
     { p: [39.2, -45.9], name: "JUMBEAUX'S", sub: '爪爪冰棍 PAWPSICLES', style: 'cream' },
   ];
   const ms = sheets.market;
@@ -629,7 +650,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
   stallDefs.forEach((s, i) => {
     const W = 2.6;
     if (ms && runs[i]) {
-      const piece = ms.piece({ u0: runs[i][0], u1: runs[i][1], width: W, depth: 1.5, reliefScale: 0.4, cell: 0.03, taper: false });
+      const piece = ms.piece({ u0: runs[i][0], u1: runs[i][1], width: W, depth: 1.5, reliefScale: 0.4, cell: 0.03, taper: false, skin: 'house' });
       if (ms.depth) { const back = piece.children[piece.children.length - 1].clone(); back.scale.z = -1; back.position.z = -1.5; piece.add(back); }      // 背面也有浮雕
       if (s.n) placeAB(piece, [s.p[0] + W / 2, s.p[1] + 0.75], [s.p[0] - W / 2, s.p[1] + 0.75]);    // 后排正面朝北
       else placeAB(piece, [s.p[0] - W / 2, s.p[1] - 0.75], [s.p[0] + W / 2, s.p[1] - 0.75]);        // 前排正面朝南（朝向大马路）
@@ -637,9 +658,18 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
       G.add(piece);
       // 摊位顶上的招牌（官方英文名 + 中文品类）
       const H = piece.userData.H, top = piece.userData.height / H;
-      const sign = S.letters(s.name, s.sub, { w: 1.55, style: s.style, zhFont: 'Arial, "Microsoft YaHei", sans-serif', enFont: '"Microsoft YaHei", Arial, sans-serif', enRatio: 0.34, night: 0.8 });
-      const uc = (runs[i][0] + runs[i][1]) / 2, v = top * 0.885;
-      sign.position.set(W / 2, v * H, ms.reliefMaxZ(uc - 0.02, uc + 0.02, v - 0.03, v + 0.03) * 0.4 + 0.05);
+      const v = top * 0.885;
+      // 招牌的宽度和位置按「招牌上沿那个高度处」摊位轮廓的实际宽度来定：
+      // 有的摊位（咩花糖的推车）顶部比底座窄，按整摊宽度居中放字，字会伸到轮廓外面、悬在半空
+      let ca = Math.floor(runs[i][0] * ms.cols), cb = Math.ceil(runs[i][1] * ms.cols) - 1;
+      const vTop = v + 0.3 / H;
+      while (ca < cb && ms.top[ca] < vTop) ca++;
+      while (cb > ca && ms.top[cb] < vTop) cb--;
+      const ua = ca / ms.cols, ub = (cb + 1) / ms.cols, uSpan = runs[i][1] - runs[i][0];
+      const sw = s.signW || Math.max(0.8, Math.min(1.55, ((ub - ua) / uSpan) * W * 0.88)), uc = (ua + ub) / 2;
+      const sign = S.letters(s.name, s.sub, { w: sw, style: s.style, zhFont: 'Arial, "Microsoft YaHei", sans-serif', enFont: '"Microsoft YaHei", Arial, sans-serif', enRatio: 0.34, night: 0.8 });
+      const sv = v + (s.signDy || 0) / H;
+      sign.position.set(((uc - runs[i][0]) / uSpan) * W, sv * H, ms.reliefMaxZ(uc - 0.02, uc + 0.02, sv - 0.03, sv + 0.03) * 0.4 + 0.05);
       piece.add(sign); signMats0.push(...sign.userData.lit);
     } else {
       const g = new THREE.Group();

@@ -1,7 +1,7 @@
 // 建筑：街区体量 + 生成立面块 + 动物城之窗塔 + 警局巨石 + 天际线 + 招牌霓虹
 import * as THREE from 'three';
-import { FacadeSheet, placeAB, bendAround, normalCanvas, closeFacadeWorkers } from './facade.js';
-import { canvas, canvasTex, polyPrism, shoelace, mulberry32, batchStatic } from './util.js';
+import { FacadeSheet, placeAB, bendAround, normalCanvas, closeFacadeWorkers, sideTextures } from './facade.js';
+import { canvas, canvasTex, polyPrism, polyFlat, shoelace, mulberry32, batchStatic } from './util.js';
 import { FACADES, BLOCKS, BLOCK_H, ZOOTRON, ZPD, WALLS } from './layout.js';
 import { blobGeo, coniferGeo, merge, T, instanced, signTex, PROP_MATS, tubeAlong } from './props.js';
 import * as S from './signs.js';
@@ -135,6 +135,16 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
     east: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, map: brick }),
     ride: rockMat,
   };
+  // 灰泥墙面加一层抹灰起伏的法线，斜光下不再是一块平板
+  for (const k of ['west', 'central']) { bodyMats[k].normalMap = sideTextures().plaster.normalMap; bodyMats[k].normalScale = new THREE.Vector2(0.8, 0.8); }
+  const roofTile = (img, tint) => {
+    if (!img) return new THREE.MeshStandardMaterial({ color: tint, roughness: 0.85 });
+    const c = canvas(1024, 1024, (g) => g.drawImage(img, 0, 0, 1024, 1024));
+    const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.repeat.set(0.2, 0.2); map.anisotropy = 8;
+    const nm = new THREE.CanvasTexture(normalCanvas(c, 2.4)); nm.wrapS = nm.wrapT = THREE.RepeatWrapping; nm.repeat.set(0.2, 0.2);
+    return new THREE.MeshStandardMaterial({ map, normalMap: nm, color: tint, roughness: 0.8 });
+  };
+  const roofMats = { west: roofTile(tex.terracotta, 0xf2d8cc), central: roofTile(tex.bluetile, 0xc9c2e6), east: roofTile(tex.terracotta, 0xd9b8a6) };
   for (const [k, poly] of Object.entries(BLOCKS)) {
     const g = polyPrism(insetPoly(poly, 0.4), 0, BLOCK_H[k]);
     // 侧墙按世界坐标平铺贴图
@@ -144,6 +154,11 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
       else uv.setXY(i, (pos.getX(i) * Math.abs(nor.getZ(i)) + pos.getZ(i) * Math.abs(nor.getX(i))) / 5, pos.getY(i) / 5);
     }
     const m = new THREE.Mesh(g, bodyMats[k]); m.castShadow = m.receiveShadow = true; G.add(m);
+    // 屋顶：街区体量的顶面原来和侧墙同一种纯色灰泥，从高处看是一块平板。铺上瓦面，再沿边加一圈女儿墙
+    if (k !== 'ride' && roofMats[k]) {
+      const inner = insetPoly(poly, 0.75);
+      const top = new THREE.Mesh(polyFlat(inner, BLOCK_H[k] + 0.03, 1), roofMats[k]); top.receiveShadow = true; G.add(top);
+      const rim = new THREE.Mesh(polyPrism(insetPoly(poly, 0.4), BLOCK_H[k], BLOCK_H[k] + 0.42), bodyMats[k]); rim.castShadow = true; G.add(rim);    }
   }
 
   // ---------------- 3. 立面块
@@ -157,7 +172,7 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
       facInfo[f.id] = { ...f, width, H: 11, height: 11, obj: ph };
       continue;
     }
-    const p = s.piece({ u0: f.u[0], u1: f.u[1], width, depth: f.depth, hScale: f.hScale || 1, cap: f.cap ?? null, auto: f.auto !== false, noCard: !!f.noCard, cell: tex.cell || 0.12 });
+    const p = s.piece({ u0: f.u[0], u1: f.u[1], width, depth: f.depth, hScale: f.hScale || 1, cap: f.cap ?? null, auto: f.auto !== false, noCard: !!f.noCard, cell: tex.cell || 0.12, skin: 'house' });
     placeAB(p, f.a, f.b); G.add(p);
     facInfo[f.id] = { ...f, width, H: p.userData.H, height: p.userData.height, obj: p, sheetObj: s, u0: p.userData.u0, u1: p.userData.u1 };
   }
@@ -376,7 +391,9 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
     // 依据夜景 / 日景实拍：上屏是警局公益广告，中屏轮播「不眠考拉」咖啡和一张电影海报，下屏放影片片段（这里换成演唱会广告）。
     const SW = 512, SH = 1024;
     const scrC = canvas(SW, SH), scrT = canvasTex(scrC);
-    const scrMat = new THREE.MeshStandardMaterial({ map: scrT, emissive: 0xffffff, emissiveMap: scrT, emissiveIntensity: 0.7, roughness: 0.3 });
+    // 屏幕靠自发光显示画面：底色压到接近黑，不然白天太阳照在浅色画面上会叠加过曝成一片白
+    // 表面做成哑光、几乎不反射天空：原来偏亮的反光会在画面上蒙一层灰白
+    const scrMat = new THREE.MeshStandardMaterial({ map: scrT, color: 0x16161a, emissive: 0xffffff, emissiveMap: scrT, emissiveIntensity: 0.95, roughness: 0.9, envMapIntensity: 0.15 });
     const R3 = { top: [0, 0, 512, 296], low: [0, 300, 512, 263], mid: [0, 568, 328, 456] };       // 三块屏在同一张画布上的分区
     const SCRZ = 4.55;
     const screen = (key, w, h, y) => {
@@ -517,7 +534,8 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
     G.add(Z);
     // 夜里：塔身被染成洋红，环间灯带、屏幕、跑马屏更亮
     terr.emissive = new THREE.Color(0xff2a9a);
-    nightFns.push((e) => { glowMat.emissiveIntensity = e * 1.5; scrMat.emissiveIntensity = 0.7 + e * 0.45; ribMat.emissiveIntensity = 0.55 + e * 0.6; terr.emissiveIntensity = e * 0.2; });
+    // 屏幕夜里还要叠泛光，亮度稍微收一点，浅色画面才不会糊成白板
+    nightFns.push((e) => { glowMat.emissiveIntensity = e * 1.5; scrMat.emissiveIntensity = 0.95 - e * 0.12; ribMat.emissiveIntensity = 0.55 + e * 0.6; terr.emissiveIntensity = e * 0.2; });
     // 屏幕向广场投射的紫粉色环境光
     const glow = new THREE.PointLight(0xe24cc0, 0, 60, 1.4); glow.position.set(ZOOTRON.c[0], 12, -ZOOTRON.c[1] + 9); G.add(glow);
     nightFns.push((e) => { glow.intensity = e * 55; });
@@ -582,6 +600,12 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
         const uc = u0 + s * (u1 - u0), du = (w / 2 / W) * (u1 - u0), hv = h / 2 / Hs;
         const z = Rb + zs.reliefMaxZ(uc - du, uc + du, v - hv, v + hv) * 1.45 + out, th = (s - 0.5) * span;
         obj.position.set(z * Math.sin(th), v * Hs, z * Math.cos(th)); obj.rotation.y = th; Pg.add(obj);
+        // 宽的字牌是一张平板，贴在半径 10 米的圆厅上两端会翘出去半米多、像飘在空中：把它沿圆弧弯过去
+        if (w > 2.5 && obj.geometry && obj.geometry.type === 'PlaneGeometry') {
+          const g2 = new THREE.PlaneGeometry(w, h, 32, 1), p = g2.attributes.position;
+          for (let i = 0; i < p.count; i++) { const a = p.getX(i) / z; p.setX(i, z * Math.sin(a)); p.setZ(i, z * Math.cos(a) - z); }
+          g2.computeVertexNormals(); obj.geometry.dispose(); obj.geometry = g2;
+        }
       };
     }
     const l1 = label('ZOOTOPIA POLICE', { w: 7.4, h: 1.0, color: '#ffffff', font: 'bold 140px Arial, sans-serif', px: [1400, 200] }); if (arc) arc(l1, 0.5, 0.455, 0.35, 7.4, 1.0); else { l1.position.set(0, 6.55, R + 2.6); Pg.add(l1); } lit.push([l1, 0.0, 1.5]);
@@ -629,7 +653,7 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
       const pxW = (t.u1 - t.u0) * t.s.w;
       const scale = (row ? 0.034 : 0.026) * (0.9 + rnd() * 0.25);      // 米/像素
       const w = pxW * scale;
-      const p = t.s.piece({ u0: t.u0, u1: t.u1, width: w, depth: Math.min(w * 0.7, 3.2), reliefScale: 0.32, cell: 0.07, taper: false });
+      const p = t.s.piece({ u0: t.u0, u1: t.u1, width: w, depth: Math.min(w * 0.7, 3.2), reliefScale: 0.32, cell: 0.07, taper: false, skin: 'wrap' });
       const yaw = (x + 12) * 0.006;
       p.position.set(x - w / 2, baseY + (row ? 2.2 : 0.6), -y); p.rotation.y = -yaw;
       S.add(p);

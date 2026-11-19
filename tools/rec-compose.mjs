@@ -15,18 +15,19 @@ const music = process.argv[2] || ['bgm.mp3', 'bgm.webm', 'bgm.m4a'].find((n) => 
 for (const [src, dst] of [['C:/Windows/Fonts/msyhbd.ttc', 'font_b.ttc'], ['C:/Windows/Fonts/msyh.ttc', 'font_r.ttc']]) if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
 
-// [镜头, 中文, 英文小字]：字幕在镜头开始 0.5 秒后出现、结束前 0.5 秒消失
+// [镜头, 中文, 英文小字, 位置]：字幕在镜头开始 0.5 秒后出现、结束前 0.5 秒消失。
+// 文案只写画面里看得见的东西，不做评价；位置默认左下角，'top' 放左上角（烟花镜头里城堡在画面下方，左下角会挡住它）
 const CAPS = [
-  ['entrance', '上午十点，从大马路进城', 'MANE STREET'],
-  ['frufru', '橱窗里的小裙子，比电影里还精致', 'FASHIONS BY FRU FRU'],
-  ['circle', '环岛中央，全城的广告挤在一座塔上', 'TAIL CHASE CIRCLE'],
-  ['police', '警局门口，长颈鹿出租车已经在等', 'ZOOTOPIA POLICE DEPARTMENT'],
-  ['market', '傍晚的食集，冰棍和爆米花', 'ZOOTOPIA MARKET'],
-  ['castle', '太阳落下去的方向，是城堡', 'DUSK'],
+  ['entrance', '上午十点，露露精品店的橱窗里挂着小裙子', 'FASHIONS BY FRU FRU'],
+  ['frufru', '店门口站着一位熊门童', 'THE DOORMAN'],
+  ['circle', '追尾环岛旁，一座塔上挂满了广告', 'TAIL CHASE CIRCLE'],
+  ['police', '砂岩巨石垒成的动物城警局', 'ZOOTOPIA POLICE DEPARTMENT'],
+  ['market', '傍晚的食集：冰沙、爆米花、冰棍、棉花糖', 'ZOOTOPIA MARKET'],
+  ['castle', '黄昏，树梢后面露出城堡的尖顶', 'DUSK'],
   ['nightfall', '灯，一盏一盏亮起来', 'NIGHTFALL'],
-  ['neon', '入夜的大马路', 'MANE STREET AFTER DARK'],
-  ['fireworks', '八点整，烟花升起', 'FIREWORKS OVER THE CASTLE'],
-].map(([id, zh, en]) => [START[id][0] + 0.5, START[id][1] - 0.5, zh, en]);
+  ['neon', '入夜，警局的招牌亮了', 'AFTER DARK'],
+  ['fireworks', '城堡上空，烟花升起', 'FIREWORKS OVER THE CASTLE', 'top'],
+].map(([id, zh, en, pos]) => [START[id][0] + 0.5, START[id][1] - 0.5, zh, en, pos || 'bottom']);
 // 1. 每条字幕做成一张带透明底的行李牌
 CAPS.forEach(([, , zh, en], i) => {
   fs.writeFileSync(`cap${i}_zh.txt`, zh); fs.writeFileSync(`cap${i}_en.txt`, en);
@@ -41,18 +42,18 @@ fs.writeFileSync('end_zh.txt', '动物城，下次见'); fs.writeFileSync('end_e
 // 2. 合成
 const inputs = ['-framerate', String(FPS), '-i', 'frames/f_%05d.jpg', '-loop', '1', '-t', String(DUR), '-i', 'gfx/title2.png'];
 CAPS.forEach((_, i) => inputs.push('-loop', '1', '-t', String(DUR), '-i', `cap${i}.png`));
-let g = `[1:v]scale=${px(1500)}:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=0.8:d=0.7:alpha=1,fade=t=out:st=${(START.aerial[1] - 1.4).toFixed(2)}:d=0.8:alpha=1[ttl];` +
+let g = `[1:v]scale=${px(1500)}:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=0.8:d=0.7:alpha=1,fade=t=out:st=${(START.arrive[1] - 1.4).toFixed(2)}:d=0.8:alpha=1[ttl];` +
         // 片头字抠掉黑底后直接盖在画面上（滤色叠加在白天的亮天空上会发灰），字后面的画面同时压暗一点
-        `[0:v]eq=brightness='-0.10*between(t,1.0,${(START.aerial[1] - 0.9).toFixed(2)})':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-${px(40)}:enable='between(t,0.8,${(START.aerial[1] - 0.5).toFixed(2)})',format=yuv420p[v0];`;
-CAPS.forEach(([a, b], i) => {
+        `[0:v]eq=brightness='-0.10*between(t,1.0,${(START.arrive[1] - 0.9).toFixed(2)})':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-${px(40)}:enable='between(t,0.8,${(START.arrive[1] - 0.5).toFixed(2)})',format=yuv420p[v0];`;
+CAPS.forEach(([a, b, , , pos], i) => {
   g += `[${i + 2}:v]format=rgba,scale=${px(1000)}:-1,fade=t=in:st=${a}:d=0.45:alpha=1,fade=t=out:st=${(b - 0.45).toFixed(2)}:d=0.45:alpha=1[c${i}];` +
-       `[v${i}][c${i}]overlay=x=${px(70)}:y=H-h-${px(70)}:enable='between(t,${a},${b})'[v${i + 1}];`;
+       `[v${i}][c${i}]overlay=x=${px(70)}:y=${pos === 'top' ? px(64) : 'H-h-' + px(70)}:enable='between(t,${a},${b})'[v${i + 1}];`;
 });
 const n = CAPS.length;
-const e0 = DUR - 4.6;            // 片尾字：最后 4.6 秒里淡入、停留、淡出
+const e0 = DUR - 4.6;            // 片尾字：最后 4.6 秒里淡入、停留、淡出。放在画面上方的空天里，不压在烟花和城堡上
 const endA = `if(lt(t,${e0}),0,if(lt(t,${e0 + 1}),t-${e0},if(lt(t,${e0 + 3.4}),1,max(0,${e0 + 4.2}-t)/0.8)))`;
-g += `[v${n}]drawtext=fontfile=font_b.ttc:textfile=end_zh.txt:fontsize=${px(92)}:fontcolor=white:shadowcolor=black@0.6:shadowx=4:shadowy=5:x=(w-text_w)/2:y=h*0.36:alpha='${endA}',` +
-     `drawtext=fontfile=font_r.ttc:textfile=end_en.txt:fontsize=${px(28)}:fontcolor=white@0.9:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.36+${px(130)}:alpha='${endA}',` +
+g += `[v${n}]drawtext=fontfile=font_b.ttc:textfile=end_zh.txt:fontsize=${px(92)}:fontcolor=white:shadowcolor=black@0.6:shadowx=4:shadowy=5:x=(w-text_w)/2:y=h*0.13:alpha='${endA}',` +
+     `drawtext=fontfile=font_r.ttc:textfile=end_en.txt:fontsize=${px(28)}:fontcolor=white@0.9:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.13+${px(130)}:alpha='${endA}',` +
      `fade=t=in:st=0:d=0.7,fade=t=out:st=${DUR - 1.3}:d=1.3[vout]`;
 const args = [...inputs];
 if (music) args.push('-i', music);

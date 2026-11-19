@@ -44,6 +44,54 @@ export function normalCanvas(c, strength = 2.5) {
   return normalFrom(d, c.width, c.height, strength);
 }
 
+// 建筑侧墙 / 屋顶共用的两张可平铺灰度纹理（粗灰泥、鱼鳞瓦），各带一张由亮度推出的法线图
+let _sideTex = null;
+export function sideTextures() {
+  if (_sideTex) return _sideTex;
+  let seed = 4242; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const mk = (draw, strength) => {
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S; draw(c.getContext('2d', { willReadFrequently: true }), S);
+    const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8;
+    const normalMap = new THREE.CanvasTexture(normalCanvas(c, strength)); normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping; normalMap.anisotropy = 4;
+    return { map, normalMap };
+  };
+  const plaster = mk((g, S) => {
+    g.fillStyle = '#f1f1f1'; g.fillRect(0, 0, S, S);
+    // 大块的深浅不匀（四周各画一份，接缝处连续）
+    for (let i = 0; i < 46; i++) {
+      const x = rnd() * S, y = rnd() * S, r = 40 + rnd() * 90, dark = rnd() < 0.55;
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        gr.addColorStop(0, dark ? 'rgba(120,120,120,.10)' : 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(128,128,128,0)');
+        g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+    // 抹灰留下的短弧痕
+    g.lineCap = 'round';
+    for (let i = 0; i < 260; i++) {
+      const x = rnd() * S, y = rnd() * S, a = rnd() * 6.3, l = 8 + rnd() * 22;
+      g.strokeStyle = rnd() < 0.5 ? 'rgba(90,90,90,.10)' : 'rgba(255,255,255,.22)'; g.lineWidth = 1 + rnd() * 2.2;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + (rnd() - 0.5) * 8, y + Math.sin(a) * l * 0.5 + (rnd() - 0.5) * 8, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    const id = g.getImageData(0, 0, S, S), d = id.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * 16; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(id, 0, 0);
+  }, 2.0);
+  const shingle = mk((g, S) => {
+    g.fillStyle = '#6d6d6d'; g.fillRect(0, 0, S, S);
+    const rows = 8, cols = 8, th = S / rows, tw = S / cols;
+    for (let r = rows; r >= -1; r--) for (let c = -1; c <= cols; c++) {       // 从下往上画：上一排压住下一排
+      const x = c * tw + (r % 2 ? tw / 2 : 0), y = r * th, k = 0.82 + rnd() * 0.3, v = Math.round(205 * k);
+      const gr = g.createLinearGradient(0, y, 0, y + th * 1.5);
+      gr.addColorStop(0, 'rgb(' + Math.round(v * 0.72) + ',' + Math.round(v * 0.72) + ',' + Math.round(v * 0.72) + ')'); gr.addColorStop(0.35, 'rgb(' + v + ',' + v + ',' + v + ')'); gr.addColorStop(1, 'rgb(' + Math.min(255, v + 26) + ',' + Math.min(255, v + 26) + ',' + Math.min(255, v + 26) + ')');
+      g.fillStyle = gr;
+      g.beginPath(); g.moveTo(x + 2, y); g.lineTo(x + tw - 2, y); g.lineTo(x + tw - 2, y + th * 0.9); g.quadraticCurveTo(x + tw - 2, y + th * 1.5, x + tw / 2, y + th * 1.5); g.quadraticCurveTo(x + 2, y + th * 1.5, x + 2, y + th * 0.9); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(40,40,40,.55)'; g.lineWidth = 2.5; g.stroke();
+    }
+  }, 2.6);
+  return (_sideTex = { plaster, shingle });
+}
+
 function simplify(pts, eps) {            // Douglas–Peucker
   if (pts.length < 3) return pts;
   const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
@@ -187,7 +235,7 @@ export class FacadeSheet {
   // 局部坐标：x 0→width 沿立面自左向右，y 向上，立面在 z=0 朝 +Z，体量向 -Z 延伸 depth
   // cap：体量只拉伸到图高的 cap 比例，其上的细长构件（尖顶、鹿角、屋顶广告牌、棕榈）改用镂空卡片
   // auto：自动裁掉两侧空白列
-  piece({ u0 = 0, u1 = 1, width, depth = 5, hScale = 1, sideColor = null, cap = null, auto = false, noCard = false, reliefScale = 1, cell = 0.12, bodyless = false, taper = true }) {
+  piece({ u0 = 0, u1 = 1, width, depth = 5, hScale = 1, sideColor = null, cap = null, auto = false, noCard = false, reliefScale = 1, cell = 0.12, bodyless = false, taper = true, skin = 'plain' }) {
     if (auto) {
       let a = Math.floor(u0 * this.cols), b = Math.ceil(u1 * this.cols) - 1;
       while (a < b && this.top[a] < 0.04) a++;
@@ -237,7 +285,47 @@ export class FacadeSheet {
       if (n) sc.multiplyScalar(0.95 / n); else sc = this.avg.clone();
     }
     const side = new THREE.MeshStandardMaterial({ color: sc, roughness: 0.9 });
-    const mesh = new THREE.Mesh(geo, [this.mat, side]);
+    const mats = [this.mat, side];
+    if (skin === 'house') {
+      // 侧墙和屋顶原来是同一种纯色，俯看或斜看时是光秃秃的平板。这里把拉伸出来的侧面按朝向分成「墙」和「屋顶」：
+      // 墙用粗灰泥纹理，屋顶用鱼鳞瓦纹理（都是可平铺的灰度图，乘上从立面取来的颜色）。
+      const sg = geo.groups.find((q) => q.materialIndex === 1);
+      const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
+      const wall = [], roof = [];
+      for (let t = sg.start; t < sg.start + sg.count; t += 3) (nor.getY(t) > 0.45 ? roof : wall).push(t);
+      const P = pos.array.slice(), N = nor.array.slice();
+      let w = sg.start;
+      for (const [list, isRoof] of [[wall, false], [roof, true]]) for (const t of list) for (let k = 0; k < 3; k++, w++) {
+        const x = P[(t + k) * 3], y = P[(t + k) * 3 + 1], z = P[(t + k) * 3 + 2], nx = N[(t + k) * 3], ny = N[(t + k) * 3 + 1], nz = N[(t + k) * 3 + 2];
+        pos.setXYZ(w, x, y, z); nor.setXYZ(w, nx, ny, nz);
+        if (isRoof) uv.setXY(w, x / 1.8, z / 1.8); else uv.setXY(w, (Math.abs(nx) > Math.abs(nz) ? z : x) / 2.6, y / 2.6);
+      }
+      geo.clearGroups();
+      const g0 = geo.index ? 0 : sg.start;       // 拉伸几何体不带索引：盖面在前，侧面在后
+      geo.addGroup(0, g0, 0); geo.addGroup(sg.start, wall.length * 3, 1); geo.addGroup(sg.start + wall.length * 3, roof.length * 3, 2);
+      const st = sideTextures();
+      side.map = st.plaster.map; side.normalMap = st.plaster.normalMap; side.normalScale = new THREE.Vector2(0.7, 0.7);
+      const rc = sc.clone().multiplyScalar(0.8).lerp(new THREE.Color(0.52, 0.42, 0.38), 0.3);
+      mats.push(new THREE.MeshStandardMaterial({ color: rc, roughness: 0.82, map: st.shingle.map, normalMap: st.shingle.normalMap, normalScale: new THREE.Vector2(1.1, 1.1) }));
+    }
+    if (skin === 'wrap') {
+      // 远景塔楼：两头的端墙和轮廓上的竖直台阶面接着贴立面图（从转角往里折过去一段），不再是一条纯色的板。
+      // 朝上的面仍用平均色。
+      const sg = geo.groups.find((q) => q.materialIndex === 1);
+      const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
+      const wall = [], roof = [];
+      for (let t = sg.start; t < sg.start + sg.count; t += 3) (Math.abs(nor.getX(t)) > 0.6 ? wall : roof).push(t);
+      const P = pos.array.slice(), N = nor.array.slice();
+      let w = sg.start;
+      for (const [list, isWall] of [[wall, true], [roof, false]]) for (const t of list) for (let k = 0; k < 3; k++, w++) {
+        const x = P[(t + k) * 3], y = P[(t + k) * 3 + 1], z = P[(t + k) * 3 + 2], nx = N[(t + k) * 3], ny = N[(t + k) * 3 + 1], nz = N[(t + k) * 3 + 2];
+        pos.setXYZ(w, x, y, z); nor.setXYZ(w, nx, ny, nz);
+        if (isWall) uv.setXY(w, Math.min(u1, Math.max(u0, uOf(x) - Math.sign(N[t * 3]) * (-z / width) * (u1 - u0))), vOf(y)); else uv.setXY(w, 0, 0);
+      }
+      geo.clearGroups();
+      geo.addGroup(0, sg.start + wall.length * 3, 0); geo.addGroup(sg.start + wall.length * 3, roof.length * 3, 1);
+    }
+    const mesh = new THREE.Mesh(geo, mats);
     mesh.castShadow = mesh.receiveShadow = true;
     const grp = new THREE.Group();
     if (!bodyless) grp.add(mesh);

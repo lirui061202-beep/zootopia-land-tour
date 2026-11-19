@@ -10,7 +10,7 @@ const SHEETS = {
   artC: { keys: ['tigers', 'bazaar', 'tiki', 'cat', 'concert', 'lemmings'] },
   artD: { keys: ['trunk', 'rabbits', 'sloth', 'bear', 'yak', 'wolves'], cut: true },
   artE: { keys: ['doorman', 'shrew', 'elephant', 'giraffeSign', 'otter', 'cruiser'], cut: true },
-  artF: { keys: ['leafA', 'leafB', 'conifer', 'camellia', 'flowers', 'agave'], cut: true },
+  artF: { keys: ['leafA', 'leafB', 'conifer', 'camellia', 'flowers', 'agave'], cut: true, green: ['leafA', 'leafB', 'conifer', 'agave'] },
 };
 export const ART = {};
 
@@ -18,7 +18,8 @@ const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.
 const isKey = (r, g, b) => r > 150 && b > 150 && g < 125 && Math.abs(r - b) < 90 && (r + b) / 2 - g > 70;
 
 // 把一格洋红底的图抠成带透明通道、并裁到内容外接框的画布
-function cutPanel(img, sx, sy, sw, sh) {
+// green：这一格画的是纯绿的枝叶（没有粉 / 紫色的东西），可以把所有偏洋红的像素都当背景处理
+function cutPanel(img, sx, sy, sw, sh, green = false) {
   const w = Math.round(sw), h = Math.round(sh);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
@@ -36,6 +37,17 @@ function cutPanel(img, sx, sy, sw, sh) {
     for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x; if (mask[i] && (!mask[i - 1] || !mask[i + 1] || !mask[i - w] || !mask[i + w]) && isKey(d[i * 4], d[i * 4 + 1], d[i * 4 + 2])) m3[i] = 0; }
     mask = m3;
   }
+  if (green) {
+    // 枝叶缝隙里的洋红常常是和叶子混了色的暗粉、灰紫，上面两道判定都认不出，贴到树上就是叶片边缘的洋红小点。
+    // 绿叶和褐色枝条的绿色分量一定不低于红、蓝里较小的那个：凡是「红和蓝都明显高过绿」的像素一律抠掉；
+    // 只高一点的（叶缘的反光被染了色）保留，但把红、蓝压回到不超过绿，去掉粉色调。
+    for (let i = 0; i < w * h; i++) {
+      if (!mask[i]) continue;
+      const r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2], m = Math.min(r, b) - gg;
+      if (m > 22) mask[i] = 0;
+      else if (m > 0) { const k = gg / Math.min(r, b); d[i * 4] = r * k; d[i * 4 + 2] = b * k; }
+    }
+  }
   for (let it = 0; it < 2; it++) {                 // 腐蚀两圈去掉洋红毛边
     const m2 = mask.slice();
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (mask[i] && ((x > 0 && !mask[i - 1]) || (x < w - 1 && !mask[i + 1]) || (y > 0 && !mask[i - w]) || (y < h - 1 && !mask[i + w]))) m2[i] = 0; }
@@ -51,7 +63,7 @@ function cutPanel(img, sx, sy, sw, sh) {
 }
 
 // 整张洋红底图片 → 带透明通道并裁到内容外接框的画布
-export function cutWhole(img) { return cutPanel(img, 0, 0, img.naturalWidth || img.width, img.naturalHeight || img.height); }
+export function cutWhole(img, green = false) { return cutPanel(img, 0, 0, img.naturalWidth || img.width, img.naturalHeight || img.height, green); }
 
 export async function loadArt(manifest, TEXDIR = './assets/tex/') {
   await Promise.all(Object.entries(SHEETS).map(async ([sheet, def]) => {
@@ -61,7 +73,7 @@ export async function loadArt(manifest, TEXDIR = './assets/tex/') {
       const pw = img.naturalWidth / 3, ph = img.naturalHeight / 2, inset = def.cut ? 0.012 : 0.035;      // 去掉分隔线
       def.keys.forEach((k, i) => {
         const sx = (i % 3) * pw + pw * inset, sy = Math.floor(i / 3) * ph + ph * inset, sw = pw * (1 - 2 * inset), sh = ph * (1 - 2 * inset);
-        if (def.cut) { const c = cutPanel(img, sx, sy, sw, sh); ART[k] = { img: c, sx: 0, sy: 0, sw: c.width, sh: c.height, cut: true }; }
+        if (def.cut) { const c = cutPanel(img, sx, sy, sw, sh, !!(def.green && def.green.includes(k))); ART[k] = { img: c, sx: 0, sy: 0, sw: c.width, sh: c.height, cut: true }; }
         else ART[k] = { img, sx, sy, sw, sh };
       });
     } catch (e) { console.warn('插画加载失败', sheet, e); }
