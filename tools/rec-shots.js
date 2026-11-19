@@ -11,7 +11,7 @@ export const SHOTS = [
   { id: 'circle',   dur: 8, tod: [0, 0.14],   fov: 58, cam: [[-21.5, -27.5, 2.1], [-16.2, -22.5, 2.6], [-13.5, -14.5, 3.4], [-15.5, -8, 4.2]], look: [[-28.5, -6, 7], [-29, -3, 9.5], [-29.6, 0.6, 12], [-29.6, 0.6, 14.5]] },
   { id: 'police',   dur: 7, tod: [0.14, 0.32], fov: 62, cam: [[-13.5, -20.8, 1.8], [-10.5, -21.6, 1.9], [-4, -22.2, 2.2], [1.8, -24.8, 2.6]], look: [[-7.2, -24.8, 1.4], [-6.6, -24.9, 1.6], [0.2, -10, 4.5], [0.8, -6, 7]] },
   { id: 'market',   dur: 8, tod: [0.32, 0.5], fov: 56, cam: [[25.5, -49.6, 1.9], [33.5, -50.4, 1.9], [41.5, -50.2, 2.1], [45.5, -50.6, 2.3]], look: [[34, -46, 2.4], [38.5, -46, 2.5], [41.5, -47, 2.2], [40, -56.2, 1.5]] },
-  { id: 'castle',   dur: 8, tod: 0.5,         fov: [40, 28], cam: [[45, -49.4, 2.2], [45, -49.6, 5.2], [45, -49.8, 8.2]], look: [[-10.4, -301, 24], [-10.4, -301, 28], [-10.4, -301, 33]] },
+  { id: 'castle',   dur: 8, tod: 0.5,         fov: [40, 31], cam: [[6.0, -20.6, 1.9], [6.6, -21.6, 2.5], [7.0, -22.4, 3.1]], look: [[-10.4, -301, 24], [-10.4, -301, 28], [-10.4, -301, 32]] },   // 和后面烟花镜头同一个机位：同一处，从黄昏到入夜
   { id: 'nightfall', dur: 8, tod: [0.5, 1],   fov: 56, cam: [[-24.5, -30, 2.2], [-22.5, -35.5, 8], [-20.5, -43, 17]], look: [[-28, -6, 9], [-27, -3, 11], [-25, 0, 13]] },
   { id: 'neon',     dur: 7, tod: 1,           fov: 58, cam: [[-30.8, -52.5, 2.0], [-28.2, -44, 2.1], [-27.6, -35.5, 2.3]], look: [[-29.5, -42, 3.6], [-28.5, -28, 5], [-28.6, -8, 10]] },
   { id: 'fireworks', dur: 8, tod: 1,          fov: [31, 26], cam: [[7, -22, 1.9], [7.3, -23.0, 2.5]], look: [[-10.4, -301, 62], [-10.4, -301, 74]] },
@@ -32,11 +32,21 @@ function spline(keys, u) {
 const range = (v, t) => (Array.isArray(v) ? lerp(v[0], v[1], t) : v);
 
 let lastTod = -1, finaleAt = 0;
+// 把渲染尺寸锁在 W×H。页面的 resize 处理会把画布改回窗口大小（标签页被切到前台、面板被拖动时都会触发），
+// 所以先在捕获阶段拦掉 resize 事件，录每一帧前再核对一次画布尺寸。
+let locked = false;
+function lock() {
+  const t = T();
+  if (!locked) { window.addEventListener('resize', (e) => e.stopImmediatePropagation(), true); locked = true; }
+  if (t.renderer.domElement.width !== W || t.renderer.domElement.height !== H) {
+    t.renderer.setPixelRatio(1); t.renderer.setSize(W, H, false); t.composer.setPixelRatio(1); t.composer.setSize(W, H);
+  }
+  t.camera.aspect = W / H; t.camera.updateProjectionMatrix();
+}
 export function setup() {
   const t = T();
   window.__cine = true; t.walker.mode = 'cine';
-  t.renderer.setPixelRatio(1); t.renderer.setSize(W, H, false); t.composer.setPixelRatio(1); t.composer.setSize(W, H);
-  t.camera.aspect = W / H; t.camera.updateProjectionMatrix();
+  lock();
   const cues = t.fw.show.cues; finaleAt = (cues.find((c) => c.type === 'glitter' && c.t > 150) || { t: 200 }).t;
   return { total: TOTAL, seconds: TOTAL / FPS, finaleAt };
 }
@@ -76,7 +86,7 @@ export async function run(from = 0, to = TOTAL) {
   const t0 = performance.now();
   try {
     for (let i = from; i < to; i++) {
-      apply(at(i));
+      lock(); apply(at(i));
       t.step(1 / FPS); t.render();
       // toDataURL 是同步的：页面在后台标签里时 toBlob 的回调会被浏览器拖到每秒一次
       const res = await fetch('http://localhost:5184/frame/' + i, { method: 'POST', body: canvas.toDataURL('image/jpeg', 0.98).slice(23) });

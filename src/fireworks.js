@@ -241,7 +241,7 @@ export class Fireworks {
       const n = Math.round(60 * k);
       for (let i = 0; i < n; i++) { dir(d); const v = v0 * (0.7 + Math.random() * 0.25); this._spawn(s.x, s.y, s.z, d[0] * v, d[1] * v + 5, d[2] * v, C.gold, C.dim, 2.2, 3.2 + Math.random() * 0.9, 1.15, 13, 4); }
     }
-    this._spawn(s.x, s.y, s.z, 0, 0, 0, [1, 1, 1], c0, big ? 26 : 18, 0.2, 0, 0);          // 炸点的一团亮光
+    this._spawn(s.x, s.y, s.z, 0, 0, 0, [0.5, 0.47, 0.4], c0, big ? 14 : 10, 0.16, 0, 0);          // 炸点的一团亮光
     this.flashCol.setRGB(c0[0], c0[1], c0[2]); this.flashAmt = Math.min(1, this.flashAmt + (big ? 0.45 : 0.25));
     this.smoke = Math.min(1, this.smoke + (big ? 0.07 : 0.04));
     this.booms.push({ t: Math.hypot(s.x, s.y, s.z) / 340, big });                           // 声音按约 340 米/秒传过来
