@@ -14,8 +14,8 @@ http.createServer((req, res) => {
   if (u === '/tour') { res.writeHead(302, { Location: '/tour/' }); return res.end(); }
   if (u.startsWith('/tour/')) u = u.slice(5);                 // 旧地址 /tour/… 继续可用
   if (u.endsWith('/')) u += 'index.html';
-  if (u === '/assets/tex/manifest.json') {                     // 贴图清单按目录实时生成
-    const list = fs.readdirSync(path.join(ROOT, 'assets/tex')).filter((f) => f.endsWith('.png') || f.endsWith('.webp'));
+  if (u === '/assets/tex/manifest.json' || u === '/assets/tex_png/manifest.json') {   // 贴图清单按目录实时生成
+    const list = fs.readdirSync(path.join(ROOT, path.dirname(u))).filter((f) => f.endsWith('.png') || f.endsWith('.webp'));
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(list));
   }

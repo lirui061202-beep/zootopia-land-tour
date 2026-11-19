@@ -3,7 +3,7 @@
 //   R.run()                                                                         // 逐帧渲染并发给 tools/rec-server.mjs
 // 每个镜头：dur 秒；tod 一天里的时间（0 白天 → 0.5 黄昏 → 1 夜晚），可以是 [起, 止]；fov 竖直视角；
 // cam / look 是若干关键点 [x 东, y 北, 高度]，镜头沿它们平滑滑过去。
-export const FPS = 30, W = 1920, H = 1080;
+export const FPS = 30, W = 2560, H = 1440;      // 按 1440p 渲染，成片再缩到需要的尺寸
 export const SHOTS = [
   { id: 'aerial',   dur: 7, tod: 0,           fov: 50, cam: [[-104, -132, 66], [-80, -108, 40], [-62, -90, 24]], look: [[-24, -22, 10], [-26, -28, 8], [-29, -38, 5]] },
   { id: 'entrance', dur: 8, tod: 0,           fov: 60, cam: [[-46.2, -73.2, 1.9], [-39.4, -62.4, 1.9], [-33.6, -53.8, 2.0], [-29.4, -45.5, 2.0]], look: [[-39, -62, 3.0], [-30, -47, 3.6], [-27.6, -31, 4.4], [-27.6, -15, 7]] },
@@ -79,7 +79,7 @@ export async function run(from = 0, to = TOTAL) {
       apply(at(i));
       t.step(1 / FPS); t.render();
       // toDataURL 是同步的：页面在后台标签里时 toBlob 的回调会被浏览器拖到每秒一次
-      const res = await fetch('http://localhost:5184/frame/' + i, { method: 'POST', body: canvas.toDataURL('image/jpeg', 0.94).slice(23) });
+      const res = await fetch('http://localhost:5184/frame/' + i, { method: 'POST', body: canvas.toDataURL('image/jpeg', 0.98).slice(23) });
       if (state.stop) break;
       if (!res.ok) throw new Error('save failed ' + res.status);
       state.done = i + 1; state.ms = (performance.now() - t0) / (i + 1 - from);

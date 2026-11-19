@@ -104,7 +104,7 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
   const nightFns = [];
   const rockMat = tex.rockMat;
 
-  await loadArt(tex.manifest);
+  await loadArt(tex.manifest, tex.dir);
   ADS = makeAds();
   tex.mark?.('art');
 
@@ -116,8 +116,8 @@ export async function buildBuildings(scene, env, tex, onProgress = () => {}) {
     const fDay = tex.file(n), fNight = tex.file(n + '_n'), fDepth = tex.file(n + '_d');
     if (fDay) {
       try {
-        sheets[n] = await FacadeSheet.load(n, './assets/tex/' + fDay, fNight ? './assets/tex/' + fNight : null,
-          { depthUrl: fDepth ? './assets/tex/' + fDepth : null, maxW: tex.maxSheet || 0 });
+        sheets[n] = await FacadeSheet.load(n, tex.dir + fDay, fNight ? tex.dir + fNight : null,
+          { depthUrl: fDepth ? tex.dir + fDepth : null, maxW: tex.maxSheet || 0 });
       }
       catch (e) { console.warn('立面加载失败', n, e); }
     }

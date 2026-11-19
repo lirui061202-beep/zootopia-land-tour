@@ -57,15 +57,17 @@ async function boot() {
   prog(0.06);
 
   // 贴图清单
+  // ?orig：改用未压缩的 PNG 原图（assets/tex_png，体积大、不入库），录视频时用
+  const TEXDIR = new URLSearchParams(location.search).has('orig') ? './assets/tex_png/' : './assets/tex/';
   let manifest = [];
-  try { manifest = await (await fetch('./assets/tex/manifest.json', { cache: 'no-store' })).json(); } catch (e) { console.warn('缺少 manifest.json'); }
+  try { manifest = await (await fetch(TEXDIR + 'manifest.json', { cache: 'no-store' })).json(); } catch (e) { console.warn('缺少 manifest.json'); }
   // 贴图已转成 WebP（体积约为 PNG 的七分之一）；清单里有哪个扩展名就用哪个
   const texFile = (n) => [n + '.webp', n + '.png'].find((f) => manifest.includes(f)) || null;
   // 中档画质（集成显卡）把高清立面图缩到 1600 像素宽再处理：显存和加载时间都省一半多，隔着几米看不出差别
-  const tex = { manifest, cell: HIGH ? 0.09 : 0.12, mark, file: texFile, maxSheet: HIGH ? 0 : 1600 };
+  const tex = { manifest, cell: HIGH ? 0.09 : 0.12, mark, dir: TEXDIR, file: texFile, maxSheet: HIGH ? 0 : 1600 };
   if (texFile('rock')) {
     // 生成的岩石偏橙红；实景是赭黄偏米色的砂岩，这里把色相往米黄拉、降一点饱和度
-    const im = (await new THREE.TextureLoader().loadAsync('./assets/tex/' + texFile('rock'))).image;
+    const im = (await new THREE.TextureLoader().loadAsync(TEXDIR + texFile('rock'))).image;
     const c = document.createElement('canvas'); c.width = c.height = 1024;
     const g = c.getContext('2d'); g.drawImage(im, 0, 0, 1024, 1024);
     const id = g.getImageData(0, 0, 1024, 1024), d = id.data;
@@ -77,7 +79,7 @@ async function boot() {
     tex.rock = new THREE.CanvasTexture(c);
     tex.rock.colorSpace = THREE.SRGBColorSpace; tex.rock.anisotropy = 8;
   }
-  for (const n of ['paving', 'asphalt', 'terracotta', 'bluetile', 'foliage', 'bark', 'frond']) if (texFile(n)) { try { tex[n] = (await new THREE.TextureLoader().loadAsync('./assets/tex/' + texFile(n))).image; } catch (e) { /* 用程序纹理兜底 */ } }
+  for (const n of ['paving', 'asphalt', 'terracotta', 'bluetile', 'foliage', 'bark', 'frond']) if (texFile(n)) { try { tex[n] = (await new THREE.TextureLoader().loadAsync(TEXDIR + texFile(n))).image; } catch (e) { /* 用程序纹理兜底 */ } }
   prog(0.12); mark('textures');
 
   const ground = buildGround(scene, tex);

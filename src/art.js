@@ -53,11 +53,11 @@ function cutPanel(img, sx, sy, sw, sh) {
 // 整张洋红底图片 → 带透明通道并裁到内容外接框的画布
 export function cutWhole(img) { return cutPanel(img, 0, 0, img.naturalWidth || img.width, img.naturalHeight || img.height); }
 
-export async function loadArt(manifest) {
+export async function loadArt(manifest, TEXDIR = './assets/tex/') {
   await Promise.all(Object.entries(SHEETS).map(async ([sheet, def]) => {
     const file = [sheet + '.webp', sheet + '.png'].find((f) => manifest.includes(f)); if (!file) return;
     try {
-      const img = await loadImg('./assets/tex/' + file);
+      const img = await loadImg(TEXDIR + file);
       const pw = img.naturalWidth / 3, ph = img.naturalHeight / 2, inset = def.cut ? 0.012 : 0.035;      // 去掉分隔线
       def.keys.forEach((k, i) => {
         const sx = (i % 3) * pw + pw * inset, sy = Math.floor(i / 3) * ph + ph * inset, sw = pw * (1 - 2 * inset), sh = ph * (1 - 2 * inset);

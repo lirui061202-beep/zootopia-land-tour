@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 const REC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'rec');
 process.chdir(REC);                                    // 滤镜里的路径都用相对路径，避开盘符冒号的转义
 const FPS = 30, DUR = 85;
-const music = process.argv[2] || (fs.existsSync('bgm.mp3') ? 'bgm.mp3' : null);
+const S = 1440 / 1080;                                  // 逐帧画面是 1440p；叠加的字和牌子按 1080p 设计，这里统一放大
+const px = (n) => Math.round(n * S);
+const music = process.argv[2] || ['bgm.mp3', 'bgm.webm', 'bgm.m4a'].find((n) => fs.existsSync(n)) || null;
 for (const [src, dst] of [['C:/Windows/Fonts/msyhbd.ttc', 'font_b.ttc'], ['C:/Windows/Fonts/msyh.ttc', 'font_r.ttc']]) if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
 
@@ -38,22 +40,24 @@ fs.writeFileSync('end_zh.txt', '动物城，下次见'); fs.writeFileSync('end_e
 // 2. 合成
 const inputs = ['-framerate', String(FPS), '-i', 'frames/f_%05d.jpg', '-loop', '1', '-t', String(DUR), '-i', 'gfx/title2.png'];
 CAPS.forEach((_, i) => inputs.push('-loop', '1', '-t', String(DUR), '-i', `cap${i}.png`));
-let g = `[1:v]scale=1500:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=1.0:d=0.8:alpha=1,fade=t=out:st=5.3:d=0.8:alpha=1[ttl];` +
+let g = `[1:v]scale=${px(1500)}:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=1.0:d=0.8:alpha=1,fade=t=out:st=5.3:d=0.8:alpha=1[ttl];` +
         // 片头字抠掉黑底后直接盖在画面上（滤色叠加在白天的亮天空上会发灰），字后面的画面同时压暗一点
-        `[0:v]eq=brightness='-0.10*between(t,1.2,5.9)':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-40:enable='between(t,1,6.2)',format=yuv420p[v0];`;
+        `[0:v]eq=brightness='-0.10*between(t,1.2,5.9)':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-${px(40)}:enable='between(t,1,6.2)',format=yuv420p[v0];`;
 CAPS.forEach(([a, b], i) => {
-  g += `[${i + 2}:v]format=rgba,fade=t=in:st=${a}:d=0.45:alpha=1,fade=t=out:st=${(b - 0.45).toFixed(2)}:d=0.45:alpha=1[c${i}];` +
-       `[v${i}][c${i}]overlay=x=70:y=H-h-70:enable='between(t,${a},${b})'[v${i + 1}];`;
+  g += `[${i + 2}:v]format=rgba,scale=${px(1000)}:-1,fade=t=in:st=${a}:d=0.45:alpha=1,fade=t=out:st=${(b - 0.45).toFixed(2)}:d=0.45:alpha=1[c${i}];` +
+       `[v${i}][c${i}]overlay=x=${px(70)}:y=H-h-${px(70)}:enable='between(t,${a},${b})'[v${i + 1}];`;
 });
 const n = CAPS.length;
 const endA = `if(lt(t,80.2),0,if(lt(t,81.2),t-80.2,if(lt(t,83.6),1,max(0,84.4-t)/0.8)))`;
-g += `[v${n}]drawtext=fontfile=font_b.ttc:textfile=end_zh.txt:fontsize=92:fontcolor=white:shadowcolor=black@0.6:shadowx=3:shadowy=4:x=(w-text_w)/2:y=h*0.36:alpha='${endA}',` +
-     `drawtext=fontfile=font_r.ttc:textfile=end_en.txt:fontsize=28:fontcolor=white@0.9:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.36+130:alpha='${endA}',` +
+g += `[v${n}]drawtext=fontfile=font_b.ttc:textfile=end_zh.txt:fontsize=${px(92)}:fontcolor=white:shadowcolor=black@0.6:shadowx=4:shadowy=5:x=(w-text_w)/2:y=h*0.36:alpha='${endA}',` +
+     `drawtext=fontfile=font_r.ttc:textfile=end_en.txt:fontsize=${px(28)}:fontcolor=white@0.9:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.36+${px(130)}:alpha='${endA}',` +
      `fade=t=in:st=0:d=0.7,fade=t=out:st=${DUR - 1.3}:d=1.3[vout]`;
 const args = [...inputs];
 if (music) args.push('-i', music);
 args.push('-filter_complex', g + (music ? `;[${n + 2}:a]atrim=0:${DUR},afade=t=in:st=0:d=1.2,afade=t=out:st=${DUR - 3}:d=3,volume=0.9[aout]` : ''), '-map', '[vout]');
 if (music) args.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '192k');
-args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-maxrate', '10M', '-bufsize', '20M', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-t', String(DUR), 'zootopia-diary.mp4');
+args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-t', String(DUR), 'zootopia-diary-1440p.mp4');
 ff(args);
-console.log('done -> ' + path.join(REC, 'zootopia-diary.mp4') + (music ? ' (with music)' : ' (silent)'));
+// 再出一份 1080p 的分享版（由 1440p 缩小而来，等于做了一遍超采样）
+ff(['-i', 'zootopia-diary-1440p.mp4', '-vf', 'scale=1920:1080:flags=lanczos', '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-maxrate', '16M', '-bufsize', '32M', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', 'zootopia-diary.mp4']);
+console.log('done -> ' + path.join(REC, 'zootopia-diary-1440p.mp4') + ' + zootopia-diary.mp4' + (music ? ' (with music)' : ' (silent)'));
