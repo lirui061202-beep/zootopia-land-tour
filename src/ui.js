@@ -32,21 +32,21 @@ export class UI {
 
   _drawBg() {
     const g = this.bg.getContext('2d'), W = this.bg.width, H = this.bg.height;
-    g.fillStyle = 'rgba(20,26,44,0.55)'; g.fillRect(0, 0, W, H);
-    this._poly(g, PARK, '#4f8f4a');
-    g.strokeStyle = '#8f8a86'; g.lineWidth = 5.8 * this.s; g.lineCap = g.lineJoin = 'round';
+    g.fillStyle = '#f3e2bd'; g.fillRect(0, 0, W, H);                 // 手帐纸的底色
+    this._poly(g, PARK, '#9ccf86');
+    g.strokeStyle = '#7f8a8d'; g.lineWidth = 5.8 * this.s; g.lineCap = g.lineJoin = 'round';
     g.beginPath(); ROAD.forEach((p, i) => (i ? g.lineTo(this.X(p[0]), this.Y(p[1])) : g.moveTo(this.X(p[0]), this.Y(p[1])))); g.stroke();
     g.beginPath(); g.arc(this.X(CIRCLE.c[0]), this.Y(CIRCLE.c[1]), (CIRCLE.rOut + CIRCLE.rIn) / 2 * this.s, 0, 7); g.lineWidth = (CIRCLE.rOut - CIRCLE.rIn) * this.s; g.stroke();
-    const cols = { west: '#e7a6a0', central: '#b59ad8', east: '#d98a5c', ride: '#b89866' };
-    for (const [k, p] of Object.entries(BLOCKS)) this._poly(g, p, cols[k], 'rgba(255,255,255,.35)');
+    const cols = { west: '#f0a9a2', central: '#bfa6e2', east: '#eaa06e', ride: '#d9c08c' };
+    for (const [k, p] of Object.entries(BLOCKS)) this._poly(g, p, cols[k], 'rgba(35,71,74,.45)');
     g.fillStyle = '#d9a066'; g.beginPath(); g.arc(this.X(ZPD.c[0]), this.Y(ZPD.c[1]), ZPD.r * this.s, 0, 7); g.fill();
     g.fillStyle = '#c9743f'; g.beginPath(); g.arc(this.X(ZOOTRON.c[0]), this.Y(ZOOTRON.c[1]), ZOOTRON.r * this.s, 0, 7); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1.5;
+    g.strokeStyle = 'rgba(31,111,107,.6)'; g.lineWidth = 1.5;
     for (const w of WALLS) { g.beginPath(); w.forEach((p, i) => (i ? g.lineTo(this.X(p[0]), this.Y(p[1])) : g.moveTo(this.X(p[0]), this.Y(p[1])))); g.stroke(); }
-    g.fillStyle = '#fff'; g.font = 'bold 15px "Microsoft YaHei",sans-serif'; g.textAlign = 'center';
+    g.fillStyle = '#23474a'; g.font = 'bold 15px "Microsoft YaHei",sans-serif'; g.textAlign = 'center';
     const tags = [['警局', ZPD.c[0], ZPD.c[1] + 16], ['大屏', ZOOTRON.c[0], ZOOTRON.c[1] + 12], ['公寓群', -13, -50], ['露露', -46, -34], ['食集', 43, -52], ['入口', -52, -90]];
     for (const [t, x, y] of tags) g.fillText(t, this.X(x), this.Y(y));
-    g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '13px sans-serif'; g.fillText('N ↑', W - 24, 18);
+    g.fillStyle = '#1f6f6b'; g.font = 'bold 13px sans-serif'; g.fillText('N ↑', W - 24, 20);
   }
 
   update() {
@@ -55,8 +55,8 @@ export class UI {
     g.drawImage(this.bg, 0, 0);
     // 游客箭头
     g.save(); g.translate(this.X(w.pos.x), this.Y(w.pos.y)); g.rotate(w.yaw);
-    g.fillStyle = 'rgba(255,180,58,.28)'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, 42, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); g.fill();
-    g.fillStyle = '#ffb43a'; g.strokeStyle = '#1b1408'; g.lineWidth = 2;
+    g.fillStyle = 'rgba(255,140,30,.3)'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, 42, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); g.fill();
+    g.fillStyle = '#ff8c1e'; g.strokeStyle = '#3a2408'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(0, -11); g.lineTo(7, 8); g.lineTo(0, 4); g.lineTo(-7, 8); g.closePath(); g.fill(); g.stroke();
     g.restore();
     // 景点提示
@@ -64,8 +64,8 @@ export class UI {
     for (const p of POIS) { const d = Math.hypot(p.p[0] - w.pos.x, p.p[1] - w.pos.y) / p.r; if (d < 1 && d < bd) { bd = d; best = p; } }
     if (best !== this.cur) {
       this.cur = best;
-      if (best) { this.poiEl.innerHTML = `${best.zh}<small>${best.en}</small>`; this.poiEl.style.opacity = 1; }
-      else this.poiEl.style.opacity = 0;
+      if (best) { this.poiEl.innerHTML = `<b>${best.zh}</b><small>${best.en}</small>`; this.poiEl.classList.add('on'); }
+      else this.poiEl.classList.remove('on');
     }
   }
 }

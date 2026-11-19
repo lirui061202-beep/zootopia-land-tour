@@ -21,7 +21,7 @@ import { lerp } from './util.js';
 const QS = new URLSearchParams(location.search);
 const DEBUG = QS.has('debug'), FAST = QS.has('fast');      // ?fast 关闭环境光遮蔽，低配机器用
 const $ = (id) => document.getElementById(id);
-const prog = (v, t) => { $('progBar').style.width = Math.round(v * 100) + '%'; if (t) $('btnGo').textContent = t; };
+const prog = (v, t) => { $('progBar').style.width = Math.round(v * 100) + '%'; if (t) $('goText').textContent = t; };
 
 async function boot() {
   const marks = [['start', Math.round(performance.now())]];
@@ -208,6 +208,8 @@ async function boot() {
     else if (e.code === 'KeyM') $('map').style.display = $('map').style.display === 'none' ? '' : 'none';
     else if (e.code === 'KeyR') walker.rescue();
     else if (e.code === 'KeyF') fw.toggle();
+    else if (e.code === 'KeyH') document.body.classList.toggle('hideui');          // 隐藏全部界面，方便截图和录屏
+    else if (e.code === 'Slash') document.body.classList.toggle('quiet');
   });
   canvasEl.addEventListener('click', () => { if (document.body.classList.contains('started') && !DEBUG) walker.lock(); });
 
@@ -284,10 +286,11 @@ async function boot() {
     return { ms, off };
   };
 
-  let last = performance.now();
+  let last = performance.now(), titleCam = null;
   const loop = (now) => {
     const raw = now - last, dt = Math.min(0.05, raw / 1000); last = now;
     if (window.__cine) { requestAnimationFrame(loop); return; }      // 逐帧录像时由录制脚本推进画面
+    if (titleCam) titleCam(now);
     step(dt); render();
     if (document.visibilityState === 'visible' && raw < 500) adapt(raw);
     requestAnimationFrame(loop);
@@ -330,7 +333,23 @@ async function boot() {
   }
   mark('warm+calibrate'); prog(1, '进入园区');
   const go = $('btnGo'); go.disabled = false;
-  go.onclick = () => { document.body.classList.add('started'); startedAt = performance.now(); fw.initAudio(); if (!DEBUG) walker.lock(); };
+  go.onclick = () => {
+    titleCam = null; walker.mode = 'walk'; camera.fov = FOV; camera.updateProjectionMatrix();
+    document.body.classList.add('started'); startedAt = performance.now(); fw.initAudio(); if (!DEBUG) walker.lock();
+    setTimeout(() => document.body.classList.add('quiet'), 16000);      // 按键提示显示十几秒后自己收起来，按 / 再叫出来
+  };
+  // 开始界面的背景：镜头在园区南侧上空对着环岛和广告塔慢慢左右摆，高度缓缓起伏
+  if (!DEBUG) {
+    walker.mode = 'cine'; camera.fov = 46; camera.updateProjectionMatrix();
+    const t0 = performance.now();
+    titleCam = (now) => {
+      // 只在园区南半边来回摆（北边是天际线塔楼，转过去会穿进楼里）
+      const s = (now - t0) / 1000, a = Math.PI / 2 + Math.sin(s * (Math.PI * 2 / 110)) * 1.05, R = 62;
+      camera.position.set(-20 + Math.cos(a) * R, 21 + Math.sin(s * 0.07) * 4, 14 + Math.sin(a) * R * 0.9);
+      camera.lookAt(-22, 9.5, 8);
+    };
+  }
+  document.body.classList.add('ready');
   step(0); render();
   requestAnimationFrame(loop);
 
