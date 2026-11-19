@@ -214,6 +214,8 @@ export function buildGround(scene, tex) {
   // 5. 警局前广场：赭色放射铺地
   const fore = new THREE.Mesh(new THREE.RingGeometry(ZPD.r + 0.2, ZPD.r + 8.5, 64, 1, Math.PI * 1.08, Math.PI * 0.84),
     new THREE.MeshStandardMaterial({ color: 0xd9a868, roughness: 0.95, map: flag }));
+  // 环形几何体自带的 UV 是把整张图摊在 36 米见方上，石板纹被放大到看不出来：改成按米平铺
+  { const p = fore.geometry.attributes.position, uv = fore.geometry.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 4.2, p.getY(i) / 4.2); }
   fore.rotation.x = -Math.PI / 2; fore.position.set(ZPD.c[0], 0.012, -ZPD.c[1]); fore.receiveShadow = true; G.add(fore);
 
   // 6. 中央绿地（遮挡矿山车的种植带）：岩石路缘 + 草坡

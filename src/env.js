@@ -21,9 +21,10 @@ uniform vec3 uSun;      // 当前太阳方向
 uniform vec3 uMoon;
 
 float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
-float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*f*(f*(f*6.0-15.0)+10.0);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
-float fbm(vec2 p){ float a=0.5, s=0.0; for(int i=0;i<5;i++){ s+=a*noise(p); p=p*2.03+17.0; a*=0.5; } return s; }
+// 每叠一层把坐标转一个角度：格点噪声的横平竖直不再层层对齐，云的边缘就不会出现带棱角的折线
+float fbm(vec2 p){ float a=0.5, s=0.0; mat2 m = mat2(0.8, 0.6, -0.6, 0.8); for(int i=0;i<5;i++){ s+=a*noise(p); p=m*p*2.03+17.0; a*=0.5; } return s; }
 
 void main(){
   vec3 d = normalize(vDir);
@@ -58,7 +59,7 @@ void main(){
   vec2 cuv = d.xz / (d.y + 0.2) * 1.15 + vec2(uTime*0.004, 0.0);
   float warp = fbm(cuv * 0.6 + 3.1);
   float f = fbm(cuv + warp * 0.9);
-  float c = smoothstep(0.50, 0.78, f) * smoothstep(0.03, 0.26, d.y);
+  float c = smoothstep(0.46, 0.86, f) * smoothstep(0.03, 0.26, d.y);
   float lit = smoothstep(0.42, 0.9, fbm(cuv + warp * 0.9 + sunDir.xz * 0.22));
   vec3 cloudDay = mix(vec3(0.74, 0.80, 0.92), vec3(1.0, 1.0, 0.99), lit);
   vec3 cloudDusk = mix(vec3(0.46, 0.34, 0.56), vec3(1.0, 0.70, 0.50), lit);
@@ -66,7 +67,7 @@ void main(){
 
   vec3 col = day * uW.x + dusk * uW.y + night * uW.z;
   vec3 cloud = cloudDay * uW.x + cloudDusk * uW.y + cloudNight * uW.z;
-  col = mix(col, cloud, c * (0.86 * uW.x + 0.8 * uW.y + 0.4 * uW.z));
+  col = mix(col, cloud, c * (0.86 * uW.x + 0.8 * uW.y + 0.22 * uW.z));
   // 地平线以下
   vec3 below = vec3(0.62,0.66,0.66) * uW.x + vec3(0.42,0.30,0.32) * uW.y + vec3(0.03,0.03,0.07) * uW.z;
   col = mix(col, below, smoothstep(0.0, -0.12, d.y));

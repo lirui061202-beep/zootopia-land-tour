@@ -273,6 +273,14 @@ export class FacadeSheet {
         const x = pos.getX(i), t = -z / depth;
         pos.setX(i, x + (width / 2 - x) * ((2 * m) / width) * t);
       }
+      // 体量越往上越薄（后墙向前收）：尖顶、山花这些高出屋面的部分不再是和整栋楼一样厚的一块板
+      if (skin === 'house' && depth >= 3) {
+        const yT = Math.max(...prof.map((p) => p[1])), y0 = yT * 0.55;
+        for (let i = 0; i < pos.count; i++) {
+          const z = pos.getZ(i), y = pos.getY(i);
+          if (z < -1e-3 && y > y0) pos.setZ(i, z * (1 - 0.7 * Math.min(1, (y - y0) / (yT - y0))));
+        }
+      }
       geo.computeVertexNormals();
     }
     let sc = sideColor;
@@ -293,13 +301,23 @@ export class FacadeSheet {
       const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
       const wall = [], roof = [];
       for (let t = sg.start; t < sg.start + sg.count; t += 3) (nor.getY(t) > 0.45 ? roof : wall).push(t);
-      const P = pos.array.slice(), N = nor.array.slice();
+      const P = pos.array.slice(), N = nor.array.slice(), col = new Float32Array(pos.count * 3).fill(1);
       let w = sg.start;
       for (const [list, isRoof] of [[wall, false], [roof, true]]) for (const t of list) for (let k = 0; k < 3; k++, w++) {
         const x = P[(t + k) * 3], y = P[(t + k) * 3 + 1], z = P[(t + k) * 3 + 2], nx = N[(t + k) * 3], ny = N[(t + k) * 3 + 1], nz = N[(t + k) * 3 + 2];
         pos.setXYZ(w, x, y, z); nor.setXYZ(w, nx, ny, nz);
         if (isRoof) uv.setXY(w, x / 1.8, z / 1.8); else uv.setXY(w, (Math.abs(nx) > Math.abs(nz) ? z : x) / 2.6, y / 2.6);
+        // 端墙和尖顶、山花的侧面：按高度取立面图边上那一列的颜色（顶点色），不再整面一个平均色。
+        // 市政厅尖顶的侧面原来是一整块淡紫色的板，夜里被屏幕的粉光一照格外扎眼。
+        let c = sc;
+        if (!isRoof && Math.abs(N[t * 3]) > 0.6) {
+          const u = Math.min(u1, Math.max(u0, uOf(x) - Math.sign(N[t * 3]) * 0.012 * (u1 - u0))), v = Math.min(vOf(y), this.top[Math.min(this.cols - 1, Math.floor(u * this.cols))] - 0.02);
+          if (v > 0.02) c = this.colorAt(u, v);
+        }
+        col[w * 3] = c.r; col[w * 3 + 1] = c.g; col[w * 3 + 2] = c.b;
       }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      side.color.set(0xffffff); side.vertexColors = true;
       geo.clearGroups();
       const g0 = geo.index ? 0 : sg.start;       // 拉伸几何体不带索引：盖面在前，侧面在后
       geo.addGroup(0, g0, 0); geo.addGroup(sg.start, wall.length * 3, 1); geo.addGroup(sg.start + wall.length * 3, roof.length * 3, 2);

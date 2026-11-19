@@ -97,7 +97,7 @@ export function buildVista(scene, env, { sheet = null, fw = null } = {}) {
     // 林下灌木丛：围墙外到林带之间、以及林带的树干之间填满一人多高的灌木。
     // 没有它，镜头升高一点就能看到林带下面是一片空地和一根根树干。高度同样不超过望向城堡的视线。
     if (leafA) {
-      const big = shrub(31, { r: 1.5, h: 2.6, n: 30 }), thick = [];
+      const big = shrub(31, { r: 1.5, h: 2.6, n: 46, core: 0.45 }), thick = [];      // 内核做小、叶片加密：不然叶缝里会露出一个个光滑的圆顶
       for (let x = -78; x <= 96; x += 2.5) for (let y = -68; y >= -116; y -= 2.5) {
         const px = x + (rnd() - 0.5) * 1.8, py = y + (rnd() - 0.5) * 1.8;
         if (near(px, py, 4)) continue;

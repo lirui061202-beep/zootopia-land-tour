@@ -22,7 +22,6 @@ const CAPS = [
   ['frufru', '店门口站着一位熊门童', 'THE DOORMAN'],
   ['circle', '追尾环岛旁，一座塔上挂满了广告', 'TAIL CHASE CIRCLE'],
   ['police', '砂岩巨石垒成的动物城警局', 'ZOOTOPIA POLICE DEPARTMENT'],
-  ['market', '傍晚的食集：冰沙、爆米花、冰棍、棉花糖', 'ZOOTOPIA MARKET'],
   ['castle', '黄昏，树梢后面露出城堡的尖顶', 'DUSK'],
   ['nightfall', '灯，一盏一盏亮起来', 'NIGHTFALL'],
   ['neon', '入夜，警局的招牌亮了', 'AFTER DARK'],

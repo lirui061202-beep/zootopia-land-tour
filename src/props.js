@@ -342,7 +342,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
     (((i / 13) | 0) % 3 === 0 ? lamps3 : lamps2).push({ x, z: y, ry: a });
   }
   // 环岛、警局前、车站前补几盏
-  [[-33.5, -8.5], [-16.5, -3.2], [-9, -9], [10.5, -9.5], [22.6, -27.6], [-40, -10]].forEach(([x, y], i) => lamps3.push({ x, z: y, ry: i }));
+  [[-33.5, -8.5], [-11.6, -3.4], [-9, -9], [10.5, -9.5], [22.6, -27.6], [-40, -10]].forEach(([x, y], i) => lamps3.push({ x, z: y, ry: i }));
   const lg2 = lampGeos(2), lg3 = lampGeos(3);
   for (const [lg, list] of [[lg2, lamps2], [lg3, lamps3]]) {
     G.add(instanced(lg.green, M.green, list), instanced(lg.gold, M.gold, list), instanced(lg.globe, M.globe, list, false));
@@ -403,7 +403,7 @@ export function buildProps(scene, env, { blocks, facInfo, sheets = {}, tex = {} 
   if (leafA && leafB) {
     // 枝叶卡片树：树干 + 主枝 + 深色内核 + 两种枝叶卡片，三种树形
     const coreMat = coreMaterial(tex.foliage);
-    const kinds = [deciduous(1), deciduous(2, { height: 6.9, spread: 2.9, nCards: 130 }), deciduous(3, { height: 5.5, spread: 2.2, nCards: 95 })];
+    const kinds = [deciduous(1, { cross: true }), deciduous(2, { height: 6.9, spread: 2.9, nCards: 130, cross: true }), deciduous(3, { height: 5.5, spread: 2.2, nCards: 95, cross: true })];
     const lists = [treeLists[0].slice(), treeLists[1].slice(), treeLists[2].slice()];
     farLists.flat().forEach((t, i) => lists[i % 3].push({ ...t, s: t.s * 0.82 }));
     kinds.forEach((k, i) => {

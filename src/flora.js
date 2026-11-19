@@ -10,7 +10,9 @@ export const mergeAll = (list) => mergeGeometries(list.map(strip), false);
 
 // 一批朝外的卡片：centers = [[x, y, z, size, nx, ny, nz]]，法线用「从树冠中心指向外」的方向，受光柔和
 // wild：每三张里有一张完全随机朝向。全都朝外时，树冠轮廓上的卡片正好侧对镜头，看上去是一道道梳出来的细线
-function cards(list, rnd, tilt = 0.6, wild = false) {
+// cross：每张卡片再配一张与它垂直相交的（十字片）。单片卡片侧对镜头时只剩一条线，树冠边缘会出现一排排「梳齿」；
+// 十字片无论从哪边看总有一片是正对着的
+function cards(list, rnd, tilt = 0.6, wild = false, cross = false) {
   const pos = [], nor = [], uv = [], idx = [];
   const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), n = new THREE.Vector3(), z = new THREE.Vector3(0, 0, 1);
   list.forEach(([x, y, zz, s, nx, ny, nz], i) => {
@@ -19,14 +21,16 @@ function cards(list, rnd, tilt = 0.6, wild = false) {
     const tl = wild && i % 3 === 0 ? 3.0 : tilt;
     e.set((rnd() - 0.5) * tl, (rnd() - 0.5) * tl, rnd() * Math.PI * 2);
     q.multiply(new THREE.Quaternion().setFromEuler(e));
-    const b = i * 4;
-    for (const [cx, cy] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
-      v.set(cx * s, cy * s, 0).applyQuaternion(q);
-      pos.push(x + v.x, y + v.y, zz + v.z);
-      const m = new THREE.Vector3(nx * 0.8 + v.x * 0.25, ny * 0.8 + v.y * 0.25 + 0.25, nz * 0.8 + v.z * 0.25).normalize();
-      nor.push(m.x, m.y, m.z); uv.push(cx + 0.5, cy + 0.5);
+    for (const turn of cross ? [0, 1] : [0]) {
+      const b = pos.length / 3;
+      for (const [cx, cy] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) {
+        if (turn) v.set(0, cy * s, cx * s * 0.9).applyQuaternion(q); else v.set(cx * s, cy * s, 0).applyQuaternion(q);
+        pos.push(x + v.x, y + v.y, zz + v.z);
+        const m = new THREE.Vector3(nx * 0.8 + v.x * 0.25, ny * 0.8 + v.y * 0.25 + 0.25, nz * 0.8 + v.z * 0.25).normalize();
+        nor.push(m.x, m.y, m.z); uv.push(cx + 0.5, cy + 0.5);
+      }
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
     }
-    idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
   });
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -49,14 +53,14 @@ function tube(points, r0, r1, seg = 10, rs = 7) {
 }
 
 // 落叶行道树：树干 + 3~4 根主枝 + 深色内核 + 两种枝叶卡片
-export function deciduous(seed, { height = 6.2, spread = 2.5, nCards = 110 } = {}) {
+export function deciduous(seed, { height = 6.2, spread = 2.5, nCards = 110, cross = false } = {}) {
   const rnd = mulberry32(seed * 977 + 13);
   const trunkH = height * 0.42, cy = height * 0.72, ry = height * 0.3;
   const wood = [tube([[0, 0, 0], [0.05, trunkH * 0.5, 0.03], [0.02, trunkH, -0.04], [0, trunkH + 0.6, 0]], 0.2, 0.11, 10, 8)];
   wood.push(new THREE.CylinderGeometry(0.22, 0.3, 0.25, 9).translate(0, 0.12, 0));        // 根颈
   const limbs = 4 + (rnd() * 2 | 0);
   for (let i = 0; i < limbs; i++) {
-    const a = (i / limbs) * Math.PI * 2 + rnd() * 0.7, d = spread * (0.45 + rnd() * 0.3), h = cy + (rnd() - 0.3) * ry * 0.8;
+    const a = (i / limbs) * Math.PI * 2 + rnd() * 0.7, d = spread * (0.3 + rnd() * 0.22), h = cy + (rnd() - 0.4) * ry * 0.5;      // 主枝留在树冠里面：伸到外壳会从叶缝里戳出一根深色细刺
     wood.push(tube([[0, trunkH * 0.9, 0], [Math.cos(a) * d * 0.4, trunkH + (h - trunkH) * 0.55, Math.sin(a) * d * 0.4], [Math.cos(a) * d, h, Math.sin(a) * d]], 0.1, 0.035, 8, 6));
   }
   const A = [], B = [];
@@ -72,11 +76,11 @@ export function deciduous(seed, { height = 6.2, spread = 2.5, nCards = 110 } = {
   }
   // 内核只是垫在最里面挡一挡对穿的视线，做小一些：太大了会从叶缝里露出一个光滑的圆顶
   const core = new THREE.IcosahedronGeometry(1, 1); core.scale(spread * 0.5, ry * 0.52, spread * 0.5); core.translate(0, cy, 0);
-  return { wood: mergeAll(wood), core, cardsA: cards(A, rnd, 0.6, true), cardsB: cards(B, rnd, 0.6, true) };
+  return { wood: mergeAll(wood), core, cardsA: cards(A, rnd, 0.6, true, cross), cardsB: cards(B, rnd, 0.6, true, cross) };
 }
 
 // 修剪成团的灌木 / 花丛：内核 + 一圈卡片
-export function shrub(seed, { r = 0.8, h = 1.0, n = 26 } = {}) {
+export function shrub(seed, { r = 0.8, h = 1.0, n = 26, core: ck = 0.7 } = {}) {
   const rnd = mulberry32(seed * 311 + 7), list = [];
   for (let i = 0; i < n; i++) {
     let dx = rnd() * 2 - 1, dy = rnd() * 0.9 + 0.1, dz = rnd() * 2 - 1;
@@ -84,7 +88,7 @@ export function shrub(seed, { r = 0.8, h = 1.0, n = 26 } = {}) {
     const k = 0.75 + rnd() * 0.3;
     list.push([dx * r * k, h * 0.45 + dy * h * 0.55 * k, dz * r * k, 0.75 + rnd() * 0.45, dx, dy + 0.2, dz]);
   }
-  const core = new THREE.IcosahedronGeometry(1, 1); core.scale(r * 0.7, h * 0.5, r * 0.7); core.translate(0, h * 0.5, 0);
+  const core = new THREE.IcosahedronGeometry(1, 1); core.scale(r * ck, h * 0.5 * (ck / 0.7), r * ck); core.translate(0, h * 0.5, 0);
   return { core, cards: cards(list, rnd, 0.9) };
 }
 
