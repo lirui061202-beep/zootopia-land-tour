@@ -19,6 +19,8 @@ import { BLOCKS } from './layout.js';
 import { lerp } from './util.js';
 
 const QS = new URLSearchParams(location.search);
+// ?ultra：满画质，录视频用——全部点光源同时亮、柔和阴影、全分辨率环境光遮蔽（自己画法线），不做任何自动降档。实时跑会很慢。
+const ULTRA = QS.has('ultra');
 const DEBUG = QS.has('debug'), FAST = QS.has('fast');      // ?fast 关闭环境光遮蔽，低配机器用
 const $ = (id) => document.getElementById(id);
 const prog = (v, t) => { $('progBar').style.width = Math.round(v * 100) + '%'; if (t) $('goText').textContent = t; };
@@ -33,7 +35,7 @@ async function boot() {
   let gpuName = '';
   try { const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); gpuName = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : ''; } catch (e) { /* 读不到就按中档 */ }
   const discrete = /NVIDIA|GeForce|RTX|GTX|Radeon (RX|Pro)|Quadro/i.test(gpuName);
-  const HIGH = !FAST && !QS.has('mid') && (QS.has('high') || discrete);
+  const HIGH = !FAST && !QS.has('mid') && (QS.has('high') || ULTRA || discrete);
   {
     const el = document.getElementById('gpu');
     // 例："ANGLE (Intel, Intel(R) Arc(TM) 140T GPU (16GB) (0x00007D51) Direct3D11 …)" → 取中间的显卡型号
@@ -46,7 +48,7 @@ async function boot() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;            // 比 PCFSoft 每像素少一半多的阴影采样，软硬程度由 shadow.radius 控制
+  renderer.shadowMap.type = ULTRA ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;            // 比 PCFSoft 每像素少一半多的阴影采样，软硬程度由 shadow.radius 控制
 
   const scene = new THREE.Scene();
   // 竖直视角 60°（原来 68°）：宽屏上 68° 相当于横向 100° 的广角，画面两侧的建筑会被明显拉斜拉宽
@@ -93,7 +95,7 @@ async function boot() {
   const walker = new Walker(camera, canvasEl, buildColliders(propsG.userData.solid));
   const fw = new Fireworks(scene, env, renderer);          // 夜晚的远景烟花（城堡方向）
   const vista = buildVista(scene, env, { sheet: B.sheets.castle, fw });   // 远景：城堡背影 + 外围树林
-  const lightPool = new LightPool(scene, 6);                // 十几盏点光源 → 白天 0 盏、夜里最近的 6 盏
+  const lightPool = ULTRA ? { update() {}, setForce() {} } : new LightPool(scene, 6);                // 十几盏点光源 → 白天 0 盏、夜里最近的 6 盏
   const ui = new UI(walker, env);
 
   // 后期：泛光（夜晚霓虹）
@@ -109,13 +111,13 @@ async function boot() {
     gtao.blendIntensity = 0.85;
     // 环境光遮蔽按半分辨率计算再放大混合：画面几乎看不出差别，但这一步的耗时降到约四分之一。
     // 高档也这样做：笔记本的高分屏上全分辨率遮蔽是整条后期里最贵的一步。
-    {
+    if (!ULTRA) {
       const fullSize = gtao.setSize.bind(gtao);
       gtao.setSize = (w, h) => fullSize(Math.max(2, Math.round(w / 2)), Math.max(2, Math.round(h / 2)));
     }
     // 遮蔽默认会把整个场景再画一遍（只为了拿深度和法线）——等于每帧两遍几何。
     // 改成直接读主画面刚画好的深度图，法线由深度推算：整整省掉一遍场景绘制和一半的绘制调用。
-    {
+    if (!ULTRA) {
       gtao._renderGBuffer = false;
       for (const m of [gtao.gtaoMaterial, gtao.pdMaterial]) { m.defines.NORMAL_VECTOR_TYPE = 0; m.defines.DEPTH_SWIZZLING = 'x'; m.uniforms.tNormal.value = null; m.needsUpdate = true; }
       gtao.normalRenderTarget.dispose();
@@ -327,7 +329,7 @@ async function boot() {
       prog(0.96 + (0.04 * (i + 1)) / views.length);
       await new Promise((r) => setTimeout(r, 0));
     }
-    if (document.visibilityState === 'visible') {                          // 页面在后台时计时不准，不测
+    if (document.visibilityState === 'visible' && !ULTRA) {                          // 页面在后台时计时不准，不测
       const cal = await calibrate([views[0], views[2], views[5], views[12]]);
       const el = $('gpu'); if (el) el.textContent += ' · 预热后每帧约 ' + cal.ms.toFixed(0) + ' 毫秒，渲染倍率 ' + renderer.getPixelRatio().toFixed(2) + (cal.off.length ? '，已自动关闭' + cal.off.join('、') : '');
     }

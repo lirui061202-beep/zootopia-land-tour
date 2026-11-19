@@ -7,25 +7,26 @@ import { fileURLToPath } from 'node:url';
 
 const REC = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'rec');
 process.chdir(REC);                                    // 滤镜里的路径都用相对路径，避开盘符冒号的转义
-const FPS = 30, DUR = 85;
+const { SHOTS, FPS } = await import('./rec-shots.js');
+const START = {}; let DUR = 0; for (const sh of SHOTS) { START[sh.id] = [DUR, DUR + sh.dur]; DUR += sh.dur; }   // 每个镜头的起止秒数
 const S = 1440 / 1080;                                  // 逐帧画面是 1440p；叠加的字和牌子按 1080p 设计，这里统一放大
 const px = (n) => Math.round(n * S);
 const music = process.argv[2] || ['bgm.mp3', 'bgm.webm', 'bgm.m4a'].find((n) => fs.existsSync(n)) || null;
 for (const [src, dst] of [['C:/Windows/Fonts/msyhbd.ttc', 'font_b.ttc'], ['C:/Windows/Fonts/msyh.ttc', 'font_r.ttc']]) if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
 
-// [开始秒, 结束秒, 中文, 英文小字]
+// [镜头, 中文, 英文小字]：字幕在镜头开始 0.5 秒后出现、结束前 0.5 秒消失
 const CAPS = [
-  [7.6, 14.4, '上午十点，从大马路进城', 'MANE STREET'],
-  [15.6, 21.4, '橱窗里的小裙子，比电影里还精致', 'FASHIONS BY FRU FRU'],
-  [22.6, 29.4, '环岛中央，全城的广告挤在一座塔上', 'TAIL CHASE CIRCLE'],
-  [30.6, 36.4, '警局门口，长颈鹿出租车已经在等', 'ZOOTOPIA POLICE DEPARTMENT'],
-  [37.6, 44.4, '傍晚的食集，冰棍和爆米花', 'ZOOTOPIA MARKET'],
-  [45.6, 52.4, '太阳落下去的方向，是城堡', 'DUSK'],
-  [53.6, 60.4, '灯，一盏一盏亮起来', 'NIGHTFALL'],
-  [61.6, 67.4, '入夜的大马路', 'MANE STREET AFTER DARK'],
-  [68.6, 75.4, '八点整，烟花升起', 'FIREWORKS OVER THE CASTLE'],
-];
+  ['entrance', '上午十点，从大马路进城', 'MANE STREET'],
+  ['frufru', '橱窗里的小裙子，比电影里还精致', 'FASHIONS BY FRU FRU'],
+  ['circle', '环岛中央，全城的广告挤在一座塔上', 'TAIL CHASE CIRCLE'],
+  ['police', '警局门口，长颈鹿出租车已经在等', 'ZOOTOPIA POLICE DEPARTMENT'],
+  ['market', '傍晚的食集，冰棍和爆米花', 'ZOOTOPIA MARKET'],
+  ['castle', '太阳落下去的方向，是城堡', 'DUSK'],
+  ['nightfall', '灯，一盏一盏亮起来', 'NIGHTFALL'],
+  ['neon', '入夜的大马路', 'MANE STREET AFTER DARK'],
+  ['fireworks', '八点整，烟花升起', 'FIREWORKS OVER THE CASTLE'],
+].map(([id, zh, en]) => [START[id][0] + 0.5, START[id][1] - 0.5, zh, en]);
 // 1. 每条字幕做成一张带透明底的行李牌
 CAPS.forEach(([, , zh, en], i) => {
   fs.writeFileSync(`cap${i}_zh.txt`, zh); fs.writeFileSync(`cap${i}_en.txt`, en);
@@ -35,20 +36,21 @@ CAPS.forEach(([, , zh, en], i) => {
     `drawtext=fontfile=font_r.ttc:textfile=cap${i}_en.txt:fontsize=22:fontcolor=0xd6e9ff:x=168:y=110`,
     '-frames:v', '1', `cap${i}.png`]);
 });
-fs.writeFileSync('end_zh.txt', '动物城，下次见'); fs.writeFileSync('end_en.txt', '爱好者制作的非官方还原 · 非商用    FAN-MADE · NON-COMMERCIAL');
+fs.writeFileSync('end_zh.txt', '动物城，下次见'); fs.writeFileSync('end_en.txt', 'SEE YOU NEXT TIME');
 
 // 2. 合成
 const inputs = ['-framerate', String(FPS), '-i', 'frames/f_%05d.jpg', '-loop', '1', '-t', String(DUR), '-i', 'gfx/title2.png'];
 CAPS.forEach((_, i) => inputs.push('-loop', '1', '-t', String(DUR), '-i', `cap${i}.png`));
-let g = `[1:v]scale=${px(1500)}:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=1.0:d=0.8:alpha=1,fade=t=out:st=5.3:d=0.8:alpha=1[ttl];` +
+let g = `[1:v]scale=${px(1500)}:-1,format=rgba,colorkey=0x000000:0.07:0.16,fade=t=in:st=0.8:d=0.7:alpha=1,fade=t=out:st=${(START.aerial[1] - 1.4).toFixed(2)}:d=0.8:alpha=1[ttl];` +
         // 片头字抠掉黑底后直接盖在画面上（滤色叠加在白天的亮天空上会发灰），字后面的画面同时压暗一点
-        `[0:v]eq=brightness='-0.10*between(t,1.2,5.9)':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-${px(40)}:enable='between(t,1,6.2)',format=yuv420p[v0];`;
+        `[0:v]eq=brightness='-0.10*between(t,1.0,${(START.aerial[1] - 0.9).toFixed(2)})':eval=frame[base];[base][ttl]overlay=x=(W-w)/2:y=(H-h)/2-${px(40)}:enable='between(t,0.8,${(START.aerial[1] - 0.5).toFixed(2)})',format=yuv420p[v0];`;
 CAPS.forEach(([a, b], i) => {
   g += `[${i + 2}:v]format=rgba,scale=${px(1000)}:-1,fade=t=in:st=${a}:d=0.45:alpha=1,fade=t=out:st=${(b - 0.45).toFixed(2)}:d=0.45:alpha=1[c${i}];` +
        `[v${i}][c${i}]overlay=x=${px(70)}:y=H-h-${px(70)}:enable='between(t,${a},${b})'[v${i + 1}];`;
 });
 const n = CAPS.length;
-const endA = `if(lt(t,80.2),0,if(lt(t,81.2),t-80.2,if(lt(t,83.6),1,max(0,84.4-t)/0.8)))`;
+const e0 = DUR - 4.6;            // 片尾字：最后 4.6 秒里淡入、停留、淡出
+const endA = `if(lt(t,${e0}),0,if(lt(t,${e0 + 1}),t-${e0},if(lt(t,${e0 + 3.4}),1,max(0,${e0 + 4.2}-t)/0.8)))`;
 g += `[v${n}]drawtext=fontfile=font_b.ttc:textfile=end_zh.txt:fontsize=${px(92)}:fontcolor=white:shadowcolor=black@0.6:shadowx=4:shadowy=5:x=(w-text_w)/2:y=h*0.36:alpha='${endA}',` +
      `drawtext=fontfile=font_r.ttc:textfile=end_en.txt:fontsize=${px(28)}:fontcolor=white@0.9:shadowcolor=black@0.6:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h*0.36+${px(130)}:alpha='${endA}',` +
      `fade=t=in:st=0:d=0.7,fade=t=out:st=${DUR - 1.3}:d=1.3[vout]`;
