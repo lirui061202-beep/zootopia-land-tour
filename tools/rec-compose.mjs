@@ -17,18 +17,19 @@ const music = process.argv.slice(2).find((a) => !a.startsWith('--')) || ['bgm.mp
 for (const [src, dst] of [['C:/Windows/Fonts/msyhbd.ttc', 'font_b.ttc'], ['C:/Windows/Fonts/msyh.ttc', 'font_r.ttc']]) if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
 
-// [镜头, 中文, 英文小字, 位置, 竖版位置]：字幕在镜头开始 0.5 秒后出现、结束前 0.5 秒消失。
+// [镜头, 中文, 英文小字, 位置, 竖版覆盖 { zh, en, pos }]：字幕在镜头开始 0.5 秒后出现、结束前 0.5 秒消失。
 // 文案只写画面里看得见的东西，不做评价；位置默认左下角，'top' 放左上角（烟花镜头里城堡在画面下方，左下角会挡住它）
 const CAPS = [
   ['entrance', '上午十点，露露精品店的橱窗里挂着小裙子', 'FASHIONS BY FRU FRU'],
-  ['frufru', '店门口站着一位熊门童', 'THE DOORMAN', 'bottom', 'top'],      // 竖版里门童在画面最下方，字幕牌改放上面
+  ['frufru', '店门口站着一位熊门童', 'THE DOORMAN', 'bottom', { pos: 'top' }],      // 竖版里门童站在画面右下，字幕牌放上面，不挡他
   ['circle', '追尾环岛旁，一座塔上挂满了广告', 'TAIL CHASE CIRCLE'],
   ['police', '砂岩巨石垒成的动物城警局', 'ZOOTOPIA POLICE DEPARTMENT'],
   ['castle', '黄昏，树梢后面露出城堡的尖顶', 'DUSK'],
   ['nightfall', '灯，一盏一盏亮起来', 'NIGHTFALL'],
   ['neon', '入夜，警局的招牌亮了', 'AFTER DARK'],
   ['fireworks', '城堡上空，烟花升起', 'FIREWORKS OVER THE CASTLE', 'top'],
-].map(([id, zh, en, pos, posV]) => [START[id][0] + 0.5, START[id][1] - 0.5, zh, en, (PORTRAIT && posV) || pos || 'bottom']);
+].map(([id, zh, en, pos, v]) => (PORTRAIT && v ? [id, v.zh || zh, v.en || en, v.pos || pos] : [id, zh, en, pos]))
+  .map(([id, zh, en, pos]) => [START[id][0] + 0.5, START[id][1] - 0.5, zh, en, pos || 'bottom']);
 // 1. 每条字幕做成一张带透明底的行李牌
 CAPS.forEach(([, , zh, en], i) => {
   fs.writeFileSync(`cap${i}_zh.txt`, zh); fs.writeFileSync(`cap${i}_en.txt`, en);
