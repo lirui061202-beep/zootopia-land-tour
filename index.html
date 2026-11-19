@@ -5,58 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>动物城游记 · 疯狂动物城园区虚拟游览</title>
 <style>
-  /* 界面走「旅行手帐」的样子：米色行李牌、青绿描边、橙色点睛，和游记视频里的字幕牌是同一套 */
-  :root { --cream:#f7ead0; --cream-2:#efdcb4; --teal:#1f6f6b; --ink:#23474a; --orange:#ff9d2e; --shadow:0 8px 22px rgba(10,20,30,.28); }
+  /* 界面取动物城自己的视觉：深蓝玻璃 + 铬蓝描边（片名那种金属蓝）、蓝底白字的路牌（园区里「大马路」路牌的样子）、
+     胡萝卜橙做强调色、霓虹洋红只在夜里的小点缀上用 */
+  :root { --navy:#0b1a3c; --navy-2:#13306b; --blue:#1f6fe0; --blue-2:#1554bd; --cyan:#35c9f2; --yellow:#ffd23a; --carrot:#ff7a1a; --carrot-2:#ffa23d; --neon:#ff4fb0;
+    --glass:rgba(11,26,60,.78); --shadow:0 10px 26px rgba(4,10,28,.45); }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; overflow:hidden; background:#0b0e1a; color:var(--ink);
+  html,body { margin:0; height:100%; overflow:hidden; background:#070d1f; color:#fff;
     font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans SC",system-ui,sans-serif; }
   canvas#view { position:fixed; inset:0; width:100%; height:100%; display:block; }
 
   /* —— 游览时的界面 —— */
   .hud { position:fixed; pointer-events:none; user-select:none; transition:opacity .45s; }
   body:not(.started) .hud, body.hideui .hud { opacity:0 !important; pointer-events:none !important; }
-  .tag { background:linear-gradient(180deg,var(--cream),var(--cream-2)); color:var(--ink); border-radius:14px;
-    box-shadow:inset 0 0 0 3px var(--cream), inset 0 0 0 4.5px rgba(31,111,107,.55), var(--shadow); }
-  #title { left:20px; top:14px; }
-  #title img { display:block; height:58px; filter:drop-shadow(0 3px 8px rgba(0,0,0,.45)); }
-  #poi { left:50%; top:18px; transform:translate(-50%,-8px); padding:10px 30px 10px 38px; text-align:center; white-space:nowrap; opacity:0; transition:opacity .4s, transform .4s; }
+  .card { background:linear-gradient(180deg, rgba(19,48,107,.86), var(--glass)); border-radius:14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    box-shadow:inset 0 0 0 1.5px rgba(53,201,242,.55), inset 0 1.5px 0 rgba(255,255,255,.28), var(--shadow); }
+  #title { left:20px; top:12px; }
+  #title img { display:block; height:62px; filter:drop-shadow(0 3px 10px rgba(0,10,40,.6)); }
+  /* 地点提示：一块蓝底白字的路牌 */
+  #poi { left:50%; top:16px; transform:translate(-50%,-10px); padding:9px 26px 10px; text-align:center; white-space:nowrap; opacity:0; transition:opacity .4s, transform .4s;
+    border-radius:10px; background:linear-gradient(180deg,#2f86f5,var(--blue-2)); box-shadow:inset 0 0 0 2.5px #fff, inset 0 0 0 4px rgba(21,84,189,.9), var(--shadow); }
   #poi.on { opacity:1; transform:translate(-50%,0); }
-  #poi::before { content:""; position:absolute; left:14px; top:50%; width:9px; height:9px; margin-top:-4.5px; border-radius:50%; background:#3b2f24; box-shadow:0 0 0 2px rgba(31,111,107,.5); }   /* 行李牌的穿绳孔 */
-  #poi b { display:block; font-size:17px; letter-spacing:.06em; }
-  #poi small { display:block; margin-top:1px; font-size:10.5px; letter-spacing:.16em; color:var(--teal); text-transform:uppercase; }
+  #poi b { display:block; font-size:18px; letter-spacing:.08em; text-shadow:0 1px 0 rgba(0,0,0,.25); }
+  #poi small { display:block; margin-top:1px; font-size:10.5px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; opacity:.92; }
   #bar { right:20px; top:16px; display:flex; gap:8px; pointer-events:auto; }
-  #bar button { all:unset; cursor:pointer; padding:9px 15px; font-size:13px; font-weight:600; color:var(--ink); border-radius:999px;
-    background:linear-gradient(180deg,var(--cream),var(--cream-2)); box-shadow:inset 0 0 0 1.5px rgba(31,111,107,.55), var(--shadow); transition:transform .12s, filter .15s; }
-  #bar button:hover { filter:brightness(1.06); transform:translateY(-1px); }
+  #bar button { all:unset; cursor:pointer; padding:9px 16px; font-size:13px; font-weight:700; letter-spacing:.04em; color:#fff; border-radius:999px;
+    background:linear-gradient(180deg, rgba(31,111,224,.92), rgba(15,60,150,.92)); box-shadow:inset 0 0 0 1.5px rgba(140,220,255,.7), inset 0 1.5px 0 rgba(255,255,255,.4), var(--shadow); transition:transform .12s, filter .15s; }
+  #bar button:hover { filter:brightness(1.12); transform:translateY(-1px); }
   #bar button:active { transform:scale(.97); }
-  #bar button.on { background:linear-gradient(180deg,#ffb655,var(--orange)); color:#3a2408; box-shadow:inset 0 0 0 1.5px rgba(120,60,0,.35), var(--shadow); }
-  #help { left:20px; bottom:18px; padding:12px 18px; font-size:12px; line-height:1.9; }
+  #bar button.on { background:linear-gradient(180deg,var(--carrot-2),var(--carrot)); box-shadow:inset 0 0 0 1.5px rgba(255,230,180,.85), inset 0 1.5px 0 rgba(255,255,255,.5), 0 0 18px rgba(255,122,26,.55), var(--shadow); }
+  #help { left:20px; bottom:18px; padding:12px 18px 12px 22px; font-size:12px; line-height:1.95; overflow:hidden; }
+  #help::before { content:""; position:absolute; left:0; top:0; bottom:0; width:6px; background:linear-gradient(180deg,var(--yellow),var(--carrot)); }   /* 警徽黄的侧条 */
   body.quiet #help { opacity:0; }
-  kbd { display:inline-block; min-width:21px; text-align:center; padding:0 6px; margin:0 1px; border-radius:6px; font:600 11px ui-monospace,Consolas,monospace;
-    color:var(--cream); background:var(--teal); box-shadow:0 2px 0 rgba(0,0,0,.25); }
-  #fps { margin-left:6px; color:var(--teal); font-variant-numeric:tabular-nums; }
-  #map { right:20px; bottom:18px; width:236px; height:196px; padding:6px; overflow:hidden; pointer-events:auto; cursor:pointer; }
-  #map canvas { width:100%; height:100%; display:block; border-radius:9px; }
-  #cross { left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; background:rgba(255,255,255,.8); box-shadow:0 0 0 1px rgba(0,0,0,.35); opacity:0; }
+  kbd { display:inline-block; min-width:21px; text-align:center; padding:0 6px; margin:0 1px; border-radius:6px; font:700 11px ui-monospace,Consolas,monospace;
+    color:var(--navy); background:linear-gradient(180deg,#fff,#cfe6ff); box-shadow:0 2px 0 rgba(0,0,0,.35); }
+  #fps { margin-left:8px; color:var(--cyan); font-variant-numeric:tabular-nums; }
+  #map { right:20px; bottom:18px; width:240px; height:222px; padding:26px 6px 6px; overflow:hidden; pointer-events:auto; cursor:pointer; }
+  #map::before { content:"动物城地图 · ZOOTOPIA MAP"; position:absolute; left:0; right:0; top:0; height:22px; line-height:22px; text-align:center; font-size:10.5px; font-weight:700; letter-spacing:.14em;
+    background:linear-gradient(180deg,#2f86f5,var(--blue-2)); box-shadow:inset 0 -1.5px 0 rgba(255,255,255,.35); }
+  #map canvas { width:100%; height:100%; display:block; border-radius:8px; }
+  #cross { left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%; background:rgba(255,255,255,.85); box-shadow:0 0 0 1px rgba(0,0,0,.35); opacity:0; }
   body.walking #cross { opacity:1; }
 
   /* —— 开始界面：后面是实景慢镜头，上下各一条电影黑边 —— */
-  #start { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; color:#fff;
-    background:#0b0e1a; transition:opacity .7s, background 1.2s; }
-  body.ready #start { background:linear-gradient(180deg, rgba(8,12,28,.42) 0%, rgba(8,12,28,.06) 34%, rgba(8,12,28,.18) 58%, rgba(8,12,28,.80) 100%); }
-  #start::before, #start::after { content:""; position:absolute; left:0; right:0; height:6.5vh; background:#05070d; }
+  #start { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center;
+    background:#070d1f; transition:opacity .7s, background 1.2s; }
+  body.ready #start { background:linear-gradient(180deg, rgba(7,16,44,.5) 0%, rgba(7,16,44,.08) 34%, rgba(7,16,44,.2) 58%, rgba(7,16,44,.84) 100%); }
+  #start::before, #start::after { content:""; position:absolute; left:0; right:0; height:6.5vh; background:#04070f; }
   #start::before { top:0; } #start::after { bottom:0; }
-  #start .logo { width:min(720px,76vw); margin-top:-4vh; filter:drop-shadow(0 10px 26px rgba(0,0,0,.55)); animation:float 6s ease-in-out infinite; }
+  #start .logo { width:min(760px,78vw); margin-top:-4vh; filter:drop-shadow(0 10px 30px rgba(0,20,70,.7)); animation:float 6s ease-in-out infinite; }
   @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
-  #start .sub { margin:0; font-size:15px; letter-spacing:.34em; text-indent:.34em; text-shadow:0 2px 10px rgba(0,0,0,.7); opacity:.95; }
-  #start .go { all:unset; cursor:pointer; position:relative; overflow:hidden; margin-top:10px; min-width:230px; padding:15px 40px; border-radius:999px; font-weight:700; font-size:17px; letter-spacing:.22em; text-indent:.22em;
-    color:#3a2408; background:linear-gradient(180deg,#ffc56a,var(--orange)); box-shadow:0 10px 26px rgba(255,140,30,.38), inset 0 0 0 2px rgba(255,255,255,.35); transition:transform .15s, filter .15s; }
-  #start .go:hover:not([disabled]) { transform:translateY(-2px) scale(1.02); filter:brightness(1.05); }
-  #start .go[disabled] { cursor:progress; color:#e9eef5; background:rgba(255,255,255,.14); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.3); }
-  #start .go i { position:absolute; left:0; top:0; bottom:0; width:0; background:rgba(255,180,70,.55); transition:width .25s; z-index:-1; }   /* 加载进度就填在按钮里 */
+  #start .sub { margin:0; padding:5px 18px; font-size:14px; font-weight:700; letter-spacing:.3em; text-indent:.3em; border-radius:8px;
+    background:linear-gradient(180deg,#2f86f5,var(--blue-2)); box-shadow:inset 0 0 0 2px #fff, 0 6px 18px rgba(0,10,40,.5); }
+  #start .go { all:unset; cursor:pointer; position:relative; overflow:hidden; margin-top:12px; min-width:240px; padding:15px 42px; border-radius:999px; font-weight:800; font-size:18px; letter-spacing:.24em; text-indent:.24em; color:#fff;
+    text-shadow:0 1px 0 rgba(120,50,0,.5); background:linear-gradient(180deg,var(--carrot-2),var(--carrot)); box-shadow:0 0 28px rgba(255,122,26,.55), inset 0 0 0 2px rgba(255,235,200,.8), inset 0 2px 0 rgba(255,255,255,.55); transition:transform .15s, filter .15s; }
+  #start .go:hover:not([disabled]) { transform:translateY(-2px) scale(1.02); filter:brightness(1.07); }
+  #start .go[disabled] { cursor:progress; text-shadow:none; background:rgba(11,26,60,.7); box-shadow:inset 0 0 0 1.5px rgba(53,201,242,.6); }
+  #start .go i { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, rgba(31,111,224,.9), rgba(53,201,242,.9)); transition:width .25s; z-index:-1; }   /* 加载进度填在按钮里 */
   #start .go:not([disabled]) i { display:none; }
-  #start .keys { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 18px; max-width:760px; font-size:12.5px; text-shadow:0 1px 6px rgba(0,0,0,.8); opacity:.92; }
-  #start .foot { position:absolute; left:0; right:0; bottom:calc(6.5vh + 12px); padding:0 24px; font-size:11px; line-height:1.7; opacity:.72; text-shadow:0 1px 6px rgba(0,0,0,.8); }
+  #start .keys { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 18px; max-width:760px; font-size:12.5px; text-shadow:0 1px 6px rgba(0,0,0,.85); }
+  #start .foot { position:absolute; left:0; right:0; bottom:calc(6.5vh + 12px); padding:0 24px; font-size:11px; line-height:1.7; opacity:.75; text-shadow:0 1px 6px rgba(0,0,0,.85); }
   #start .foot small { display:block; font-size:11px; }
   body.started #start { opacity:0; pointer-events:none; }
 </style>
@@ -71,18 +78,18 @@
 <canvas id="view"></canvas>
 
 <div id="title" class="hud"><img src="./assets/ui/title.webp" alt="动物城游记"></div>
-<div id="poi" class="hud tag"></div>
+<div id="poi" class="hud"></div>
 <div id="bar" class="hud">
   <button id="btnTime" title="切换白天 / 黄昏 / 夜晚 (N)">☀ 白天</button>
   <button id="btnTour" title="沿大马路自动游览 (T)">▶ 自动游览</button>
   <button id="btnView" title="俯瞰 / 步行 (O)">⛶ 俯瞰</button>
 </div>
-<div id="help" class="hud tag">
+<div id="help" class="hud card">
   <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 行走　<kbd>Shift</kbd> 快走　鼠标 环视<br>
   <kbd>N</kbd> 日夜　<kbd>T</kbd> 自动游览　<kbd>O</kbd> 俯瞰　<kbd>F</kbd> 烟花　<kbd>M</kbd> 地图<br>
   <kbd>H</kbd> 隐藏界面　<kbd>R</kbd> 回到路上　<kbd>/</kbd> 显示按键<span id="fps"></span>
 </div>
-<div id="map" class="hud tag" title="点击地图瞬移"><canvas width="460" height="380"></canvas></div>
+<div id="map" class="hud card" title="点击地图瞬移"><canvas width="456" height="380"></canvas></div>
 <div id="cross" class="hud"></div>
 
 <div id="start">
